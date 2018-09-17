@@ -30,7 +30,7 @@ static struct file_operations fops =
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
     struct pt_regs *reg, *reg_2;
-    unsigned long old_ip;
+    unsigned long old_ip, old_ss;
     printk("Command: %d\n", cmd);
     switch(cmd) {
         case CASE_1:
@@ -38,12 +38,14 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             //printk(KERN_INFO "Value = %d\n", value);
             reg = task_pt_regs(current);
             old_ip = reg->ip;
+            old_ss = reg->ss;
             reg->ip = arg;
             printk(KERN_INFO "Hello 1\n");
             break;
         case CASE_2:
             printk(KERN_INFO "Hello 2\n");
             reg_2 = task_pt_regs(current);
+            reg_2->ss = old_ss;
             reg_2->ip = old_ip;
             //copy_to_user((int32_t*) arg, &value, sizeof(value));
             break;
