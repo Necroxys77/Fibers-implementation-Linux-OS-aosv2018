@@ -27,16 +27,16 @@ static struct file_operations fops =
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
-    printk("Command: %d", cmd);
+    printk("Command: %d\n", cmd);
     switch(cmd) {
         case CASE_1:
             //copy_from_user(&value ,(int32_t*) arg, sizeof(value));
             //printk(KERN_INFO "Value = %d\n", value);
-            printk(KERN_INFO "Hello 1");
+            printk(KERN_INFO "Hello 1\n");
             break;
         case CASE_2:
             //copy_to_user((int32_t*) arg, &value, sizeof(value));
-            printk(KERN_INFO "Hello 2");
+            printk(KERN_INFO "Hello 2\n");
             break;
         }
         return 0;
