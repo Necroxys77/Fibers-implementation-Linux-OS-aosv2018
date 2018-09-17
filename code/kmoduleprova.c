@@ -4,6 +4,8 @@
 #include <linux/kernel.h>         // Contains types, macros, functions for the kernel
 #include <linux/fs.h>             // Header for the Linux file system support
 #include <linux/uaccess.h>          // Required for the copy to user function
+//#include <asm/processor.h> //To use task_pt_regs
+#include <linux/sched/task_stack.h>
 
 #define MAGIC 'a'
 #define CASE_1 _IO(MAGIC, 0)
@@ -27,16 +29,23 @@ static struct file_operations fops =
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
+    struct pt_regs *reg, *reg_2;
+    unsigned long old_ip;
     printk("Command: %d\n", cmd);
     switch(cmd) {
         case CASE_1:
             //copy_from_user(&value ,(int32_t*) arg, sizeof(value));
             //printk(KERN_INFO "Value = %d\n", value);
+            reg = task_pt_regs(current);
+            old_ip = reg->ip;
+            reg->ip = arg;
             printk(KERN_INFO "Hello 1\n");
             break;
         case CASE_2:
-            //copy_to_user((int32_t*) arg, &value, sizeof(value));
             printk(KERN_INFO "Hello 2\n");
+            reg_2 = task_pt_regs(current);
+            reg_2->ip = old_ip;
+            //copy_to_user((int32_t*) arg, &value, sizeof(value));
             break;
         }
         return 0;

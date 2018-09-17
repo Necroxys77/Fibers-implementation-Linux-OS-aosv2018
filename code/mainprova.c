@@ -10,19 +10,23 @@
 #define case_1 _IO(MAGIC, 0)
 #define case_2 _IO(MAGIC, 1)
 
+int fd;
+
+void hello(void){
+    int a;
+    a = 0;
+    printf("ip correctly modified!\n");
+    ioctl(fd, case_2, 0);
+}
+
 int main(int argc, char const *argv[])
 {
-    int fd = open("/dev/DeviceName", O_RDWR);
+    fd = open("/dev/DeviceName", O_RDWR);
     if (fd < 0){
         perror("Failed to open the device...");
         return errno;
     }
-
-    ioctl(fd, case_1, 2);
-    printf("First one\n");
-    ioctl(fd, case_2, 2);
-    printf("Second one\n");
-    close(fd);
-    printf("Closed\n");
+    ioctl(fd, case_1, hello);
+    printf("OOOOK\n");
     return 0;
 }
