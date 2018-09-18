@@ -1,3 +1,5 @@
+#include "test.h"
+
 int fd;
 
 void ConvertThreadToFiber(void){
@@ -20,7 +22,5 @@ int main(int argc, char const *argv[])
         perror("Failed to open the device...");
         return errno;
     }
-    ioctl(fd, case_1, hello);
-    printf("OOOOK\n");
     return 0;
 }

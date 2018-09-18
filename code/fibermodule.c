@@ -1,3 +1,5 @@
+#include "fibermodule.h"
+
 static int majorNumber;
 static struct class* charClass  = NULL; //< The device-driver class struct pointer
 static struct device* charDevice = NULL; //< The device-driver device struct pointer
@@ -20,7 +22,7 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     unsigned long old_ip, old_sp;
     printk("Command: %d\n", cmd);
     switch(cmd) {
-        case CASE_1:
+        case convertThreadToFiber:
             //copy_from_user(&value ,(int32_t*) arg, sizeof(value));
             //printk(KERN_INFO "Value = %d\n", value);
             reg = task_pt_regs(current);
