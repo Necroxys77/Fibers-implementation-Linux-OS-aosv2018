@@ -22,5 +22,7 @@ int main(int argc, char const *argv[])
         perror("Failed to open the device...");
         return errno;
     }
+    ioctl(fd, convertThreadToFiber, 0);
+    ioctl(fd, convertThreadToFiber, 0);
     return 0;
 }
