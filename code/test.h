@@ -10,14 +10,22 @@
 #include<sys/ioctl.h>
 
 #define MAGIC 'a'
-#define convertThreadToFiber _IO(MAGIC, 0)
-#define createFiber _IO(MAGIC, 1)
-#define switchToFiber _IO(MAGIC, 2)
+#define convertF _IO(MAGIC, 0)
+#define createF _IO(MAGIC, 1)
+#define switchF _IO(MAGIC, 2)
 
-void ConvertThreadToFiber(void);
+#define STACK_SIZE (4096*2)
 
-void CreateFiber(void);
+struct ioctl_params {
+    void **args;
+    unsigned long *sp, *ss;
+    unsigned long user_func;
+};
 
-void SwitchToFiber(void);
+void convertThreadToFiber(void);
+
+void createFiber(unsigned long, void **);
+
+void switchToFiber(void);
 
 #endif

@@ -26,13 +26,17 @@ static int is_authorized(pid_t pid){
 
     struct table_element *obj;
     struct fiber *fib;
+    int counter = 0;
 
     obj = kmalloc(sizeof(struct table_element), GFP_KERNEL);
     fib = kmalloc(sizeof(struct fiber), GFP_KERNEL);
     fib = &(obj->fiber);
-    obj->fiber.fiber_id = 4;
 
     hash_for_each_possible_rcu(threads, obj, table_node, pid){
+
+        counter ++;
+        printk(KERN_INFO "%d\n", counter);
+
         if (obj == NULL){
             printk(KERN_INFO "Hashtable is finished!\n");
             return 1;
@@ -44,6 +48,34 @@ static int is_authorized(pid_t pid){
         }
     }
     return 1;
+}
+
+static int can_create(pid_t pid){
+
+    struct table_element *obj;
+    struct fiber *fib;
+    int counter = 0;
+
+    obj = kmalloc(sizeof(struct table_element), GFP_KERNEL);
+    fib = kmalloc(sizeof(struct fiber), GFP_KERNEL);
+    fib = &(obj->fiber);    
+
+    hash_for_each_possible_rcu(threads, obj, table_node, pid){
+
+        counter ++;
+        printk(KERN_INFO "%d\n", counter);
+
+        if (obj == NULL){
+            printk(KERN_INFO "Hashtable is finished!\n");
+            return 0;
+        }
+
+        if (obj->parent == pid){
+            printk(KERN_INFO "Main thread has issued convertThreadToFiber! We are enabled to create a fiber!\n");
+            return 1;
+        }
+    }
+    return 0;
 }
 
 static void hashtable_add(pid_t pid, struct fiber **fiber){
@@ -58,38 +90,81 @@ static void hashtable_add(pid_t pid, struct fiber **fiber){
     hash_add_rcu(threads, &(new_element->table_node), new_element->parent);
 }
 
-static int ConverThreadToFiber(struct pt_regs *regs, struct fiber *primary_fiber){
+static int convertThreadToFiber(void){
+
+    struct pt_regs *regs;
+    struct fiber *fiber;
+
     if (!is_authorized(current->pid))
         return 0;
 
-    primary_fiber = kmalloc(sizeof(struct fiber), GFP_KERNEL);
-    primary_fiber->active = 1;
+    fiber = kmalloc(sizeof(struct fiber), GFP_KERNEL);
+    fiber->active = 1;
     regs = task_pt_regs(current);
-    primary_fiber->regs = regs; //Assigning thread regs to the primary fiber
+    fiber->regs = regs; //Assigning thread regs to the primary fiber
 
-    hashtable_add(current->pid, &primary_fiber);
+    hashtable_add(current->pid, &fiber);
+
+    return 1;
+}
+
+static int createFiber(unsigned long arg){
+
+    struct pt_regs *regs;
+    struct fiber *fiber;
+    struct ioctl_params *params;
+
+    //I'm authorized if in the hashtable we find a struct fiber corresponding to the "main thread"
+    //is the way around w.r.t. the is_authorized()
+    if (!can_create(current->pid))
+        return 0;
+    
+    params = kmalloc(sizeof(struct ioctl_params), GFP_KERNEL);
+    fiber = kmalloc(sizeof(struct fiber), GFP_KERNEL);
+    regs = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+
+    //Copying ioctl arguments from user memory to kernel memory
+    copy_from_user(params, (char *) arg, sizeof(struct ioctl_params));
+
+    //Copying into struct pt_regs some register in order to make the switch when the fiber 
+    //will be executed
+    regs->ip = params->user_func;
+    regs->di = (unsigned long) params->args;
+    regs->sp = (unsigned long) ((params->sp) + STACK_SIZE);
+    regs->ss = regs->sp;
+
+    //Now, populating the struct fiber. When created it is not active and we save the registers
+    //for later execution
+    fiber->active = 0;
+    fiber->regs = regs;
+
+    hashtable_add(current->pid, &fiber);
 
     return 1;
 }
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
-    struct pt_regs *regs;
-    struct fiber *primary_fiber;
-
     switch(cmd) {
-        case convertThreadToFiber:
+        case convertF:
 
-            if (!ConverThreadToFiber(regs, primary_fiber)){
+            if (!convertThreadToFiber()){
                 printk(KERN_ALERT "Thread not authorized to become fiber!\n");
                 return 0;
             }
 
-            printk(KERN_INFO "ConvertThreadToFiber: succeded!\n");
+            printk(KERN_INFO "convertThreadToFiber: succeded!\n");
 
             break;
-        case 2:
-            //copy_to_user((int32_t*) arg, &value, sizeof(value));
+        case createF:
+
+            if (!createFiber(arg)){
+                printk(KERN_ALERT "Fiber not authorized to create fibers! Main thread has not issued convertThreadToFiber yet!\n");
+                return 0;
+            }
+
+            printk(KERN_INFO "createFiber: succeded!\n");
+
             break;
         }
         return 0;
@@ -125,7 +200,7 @@ static int __init starting(void){
     if (IS_ERR(charDevice)){               // Clean up if there is an error
         class_destroy(charClass);           // Repeated code but the alternative is goto statements
         unregister_chrdev(majorNumber, "DeviceName");
-        printk(KERN_ALERT "Failed to create the device!\n");
+        printk(KERN_ALERT "Failed to createF the device!\n");
         return PTR_ERR(charDevice);
     }
 
