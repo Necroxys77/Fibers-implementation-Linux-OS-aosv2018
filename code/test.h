@@ -20,12 +20,11 @@ struct ioctl_params {
     void **args;
     unsigned long *sp, *ss;
     unsigned long user_func;
+    int fiber_id;
 };
 
-void convertThreadToFiber(void);
-
-void createFiber(unsigned long, void **);
-
+int convertThreadToFiber(void);
+int createFiber(unsigned long, void **);
 void switchToFiber(void);
 
 #endif

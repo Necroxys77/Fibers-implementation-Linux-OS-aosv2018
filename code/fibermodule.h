@@ -1,3 +1,6 @@
+#ifndef FIBER
+#define FIBER
+
 /*
 struct pt_regs {
     C ABI says these regs are callee-preserved. They aren't saved on kernel entry
@@ -33,9 +36,6 @@ struct pt_regs {
 };
 */
 
-#ifndef FIBER
-#define FIBER
-
 #include <linux/init.h>           // Macros used to mark up functions e.g. __init __exit
 #include <linux/module.h>         // Core header for loading LKMs into the kernel
 #include <linux/device.h>         // Header to support the kernel Driver Model
@@ -45,6 +45,7 @@ struct pt_regs {
 #include <linux/sched/task_stack.h>
 #include <linux/hashtable.h> //Required for using linux implementation of hashtables 
 #include <linux/slab.h>
+#include <asm/atomic.h>
 
 #define MAGIC 'a'
 #define convertF _IO(MAGIC, 0)
@@ -55,8 +56,8 @@ struct pt_regs {
 
 struct fiber {
     struct pt_regs *regs;
-    pid_t fiber_id;
-    int active;
+    int fiber_id;
+    atomic_t active;
     void *param; //unused!
 };
 
@@ -64,25 +65,40 @@ struct ioctl_params {
     void **args;
     unsigned long *sp, *bp;
     unsigned long user_func;
+    int fiber_id;
 };
 
-struct table_element {
-    int x;
+struct creator_thread {
+    int total_fibers;
+    struct table_element_thread *creator_thread;
+};
+
+struct table_element_thread {
+    atomic_t total_fibers;
+    pid_t parent;
+    struct fiber fiber;
+    struct hlist_node table_node;
+    DECLARE_HASHTABLE(fibers, 10); //Per-thread hashtable containing fibers created within thread
+};
+
+struct table_element_fiber {
+    struct fiber *fiber;
+    struct hlist_node table_node;
+};
+
+/*struct table_element {
+    atomic_t total_fibers;
     pid_t parent;
     struct fiber fiber;
     struct hlist_node table_node;
 };
+*/
 
-//static long my_ioctl(struct file *, unsigned int, unsigned long);
-
+static long my_ioctl(struct file *, unsigned int, unsigned long);
 static char *unlock_sudo(struct device *, umode_t *);
-
 static int __init starting(void);
-
 static void __exit exiting(void);
-
 static int convertThreadToFiber(void);
-
-static int createFiber(unsigned long);
+static int createFiber(struct ioctl_params *);
 
 #endif

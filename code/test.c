@@ -2,15 +2,23 @@
 
 int fd;
 
-void convertThreadToFiber(void){
-    ioctl(fd, convertF, NULL);
+int convertThreadToFiber(void){
+
+    struct ioctl_params params = {
+        .fiber_id = 0
+    };
+
+    ioctl(fd, convertF, &params);
+
+    printf("Fiber id: %d\n", params.fiber_id);
+    return (params.fiber_id);
 }
 
 struct stru {
     char *name;
 };
 
-void createFiber(unsigned long entry_point, void **args){
+int createFiber(unsigned long entry_point, void **args){
 
     void *sp, *ss; //Stack pointer, stack segment
     sp = malloc(STACK_SIZE); //Allocating 8KB of stack
@@ -26,10 +34,13 @@ void createFiber(unsigned long entry_point, void **args){
     };
 
     ioctl(fd, createF, &params);
-    printf("End of userspace createFiber!\n");
+
+    printf("New fiber id: %d!\n", params.fiber_id);
+    return (params.fiber_id);
 }
 
 void switchToFiber(void){
+
 
 }
 
@@ -50,16 +61,22 @@ int main(int argc, char const *argv[])
 {
     struct stru str;
     str.name = "prova";
+    int a, b, c;
 
     fd = open("/dev/DeviceName", O_RDWR);
     if (fd < 0){
         perror("Failed to open the device...");
         return errno;
     }
+    c = createFiber((unsigned long) prova, (void *) &str);
 
-    convertThreadToFiber();
+    a = convertThreadToFiber();
 
-    createFiber((unsigned long) prova, (void *) &str);
+    a = convertThreadToFiber();
+
+    b = createFiber((unsigned long) prova, (void *) &str);
+
+    c = createFiber((unsigned long) prova, (void *) &str);
 
     return 0;
 }
