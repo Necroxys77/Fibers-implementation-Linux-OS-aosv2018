@@ -36,6 +36,7 @@ int createFiber(unsigned long entry_point, void **args){
     ioctl(fd, createF, &params);
 
     printf("New fiber id: %d!\n", params.fiber_id);
+
     return (params.fiber_id);
 }
 
@@ -77,6 +78,5 @@ int main(int argc, char const *argv[])
     b = createFiber((unsigned long) prova, (void *) &str);
 
     c = createFiber((unsigned long) prova, (void *) &str);
-
     return 0;
 }

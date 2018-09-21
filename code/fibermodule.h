@@ -54,7 +54,6 @@ struct pt_regs {
 
 #define STACK_SIZE (4096*2)  // 8KB
 
-
 /**
  * Struct that defines a fiber in the system
  * 
@@ -84,11 +83,6 @@ struct ioctl_params {
     int fiber_id;
 };
 
-struct creator_thread {
-    int total_fibers;
-    struct table_element_thread *creator_thread;
-};
-
 /**
  * Struct that describe an element in the hashtable threads that contains the threads that have at least one fiber.
  * An element of the hashtable is associated to one thread - that is the creator fiber
@@ -100,7 +94,7 @@ struct creator_thread {
 struct table_element_thread {
     atomic_t total_fibers;
     pid_t parent;
-    struct fiber fiber;
+    struct fiber *fiber;
     struct hlist_node table_node;
     DECLARE_HASHTABLE(fibers, 10); //Per-thread hashtable containing fibers created within thread
 };

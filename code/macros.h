@@ -3,6 +3,7 @@
 #define hashtable_thread_add(hashtable, pid, fib) do {   \
     struct table_element_thread *new_element;   \
     new_element = kmalloc(sizeof(struct table_element_thread), GFP_KERNEL); \
+    hash_init(new_element->fibers); \
     new_element->parent = pid;  \
     atomic_set(&(new_element->total_fibers), 0);    \
     new_element->fiber = fib;   \

@@ -1,10 +1,8 @@
 #include "fibermodule.h"
 #include "macros.h"
 
-DECLARE_HASHTABLE(threads, 10); //Defining hashtable named 'threads' sized 2^10 elements containing 
+static DEFINE_HASHTABLE(threads, 10); //Defining hashtable named 'threads' sized 2^10 elements containing 
                                 //only "primary" fibers
-//DECLARE_HASHTABLE(fibers, 10); //Defining hashtable named 'fibers' sized 2^10 elements containing 
-                                //only fibers created using createFibers()
 //struct hlist_head fibers[2<<10] = {...}
 
 static int majorNumber;
@@ -46,7 +44,7 @@ static int is_authorized(pid_t pid){
     return 1;
 }
 
-static int can_create(pid_t pid, struct creator_thread *creator){
+static int can_create(pid_t pid, struct table_element_thread **creator){
 
     struct table_element_thread *obj;
 
@@ -59,9 +57,8 @@ static int can_create(pid_t pid, struct creator_thread *creator){
 
         if (obj->parent == pid){
             printk(KERN_INFO "Main thread has issued convertThreadToFiber! We are enabled to create a fiber!\n");
-            creator->total_fibers = atomic_inc_return(&(obj->total_fibers));
-            creator->creator_thread = obj; //Da unire queste due linee dic codice 
-            //total_fibers = atomic_inc_return(&(obj->total_fibers));
+            atomic_inc(&(obj->total_fibers));
+            *creator = obj;
             return 1;
         }
     }
@@ -83,8 +80,8 @@ static int convertThreadToFiber(void){
     regs = task_pt_regs(current);
     fiber->regs = regs; //Assigning thread regs to the primary fiber
 
-    hashtable_thread_add(threads, current->pid, *fiber);
-
+    hashtable_thread_add(threads, current->pid, fiber);
+    
     return 1;
 }
 
@@ -92,18 +89,15 @@ static int createFiber(struct ioctl_params *params){
 
     struct pt_regs *regs;
     struct fiber *fiber;
-    int ret_can_create;
-    struct creator_thread *creator;
+    struct table_element_thread *creator;
 
     //I'm authorized if in the hashtable we find a struct fiber corresponding to the "main thread"
     //is the way around w.r.t. the is_authorized()
 
-    creator = kmalloc(sizeof(struct creator_thread *), GFP_KERNEL);
-
-    if (!(ret_can_create = can_create(current->pid, creator)))
+    //creator = kmalloc(sizeof(struct table_element_thread *), GFP_KERNEL);
+    if (!can_create(current->pid, &creator))
         return 0;
-        
-    
+
     fiber = kmalloc(sizeof(struct fiber), GFP_KERNEL);
     regs = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
 
@@ -116,11 +110,11 @@ static int createFiber(struct ioctl_params *params){
 
     //Now, populating the struct fiber. When created it is not active and we save the registers
     //for later execution
-    fiber->fiber_id = creator->total_fibers;
+    fiber->fiber_id = atomic_read(&(creator->total_fibers));
     atomic_set(&(fiber->active), 0);
     fiber->regs = regs;
 
-    hashtable_fiber_add(creator->creator_thread->fibers, fiber);
+    hashtable_fiber_add(creator->fibers, fiber);
 
     return (fiber->fiber_id);
 }
@@ -135,7 +129,7 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
     switch(cmd) {
         case convertF:
-
+            printk(KERN_ALERT "%d\n", current->pid);
             if (!convertThreadToFiber()){
                 params->fiber_id = -1; //Error
                 printk(KERN_ALERT "Thread has already issued convertThreadToFiber!\n");
@@ -162,8 +156,46 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             kfree(params);
 
             break;
+    }
+    return 0;
+}
+
+static int clean_up_data(void){
+
+    int bkt_thread, bkt_fiber;
+    struct table_element_thread *obj_thread;
+    struct table_element_fiber *obj_fiber;
+
+    hash_for_each_rcu(threads, bkt_thread, obj_thread, table_node){
+        
+        if (obj_thread == NULL){
+            printk(KERN_INFO "Thread hashtable is finished!\n");
+            return 0;
         }
-        return 0;
+        printk(KERN_INFO "Deleting table_element_fibers of thread: %d\n", obj_thread->parent);
+
+        kfree(obj_thread->fiber);
+
+        hash_for_each_rcu(obj_thread->fibers, bkt_fiber, obj_fiber, table_node){
+                    
+            if (obj_fiber == NULL){
+                printk(KERN_INFO "Hashtable is finished!\n");
+                return 0;
+            }
+            printk(KERN_INFO "Deleting info about fiber: %d\n", obj_fiber->fiber->fiber_id);
+
+            kfree(obj_fiber->fiber->regs);
+            kfree(obj_fiber->fiber);
+
+            hash_del_rcu(&(obj_fiber->table_node));
+        }
+        printk(KERN_INFO "Fibers hashtable of thread %d empty: %d\n", obj_thread->parent, hash_empty(obj_thread->fibers));
+        
+        printk(KERN_INFO "Deleting info about thread: %d\n", obj_thread->parent);
+        hash_del_rcu(&(obj_thread->table_node));
+    }
+    printk(KERN_INFO "Threads hashtable empty: %d\n", hash_empty(threads));
+    return 1;
 }
 
 static int __init starting(void){
@@ -205,7 +237,10 @@ static int __init starting(void){
 }
 
 static void __exit exiting(void){
-    printk(KERN_INFO "We are exiting!\n");
+    int clean_up_err;
+    printk(KERN_INFO "We are exiting..\n");
+    clean_up_err = clean_up_data();
+    printk(KERN_INFO "Finished to clean up all data structures: %d\n", clean_up_err);
     device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class
