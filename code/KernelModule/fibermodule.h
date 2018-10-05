@@ -21,16 +21,16 @@ struct pt_regs {
     unsigned long dx;
     unsigned long si;
     unsigned long di;
+    unsigned long sp;
+    unsigned long ip;
+    unsigned long flags;
 
     On syscall entry, this is syscall#. On CPU exception, this is error code.
     On hw interrupt, it's IRQ number:
  
     unsigned long orig_ax;
     Return frame for iretq 
-    unsigned long ip;
     unsigned long cs;
-    unsigned long flags;
-    unsigned long sp;
     unsigned long ss;
     top of stack page 
 };
@@ -46,13 +46,23 @@ struct pt_regs {
 #include <linux/hashtable.h>    //Required for using linux implementation of hashtables 
 #include <linux/slab.h>
 #include <asm/atomic.h>     //Required for using safe concurrency control
+#include <linux/spinlock.h>
 
-#define MAGIC 'a'
-#define convertF _IO(MAGIC, 0)
-#define createF _IO(MAGIC, 1)
-#define switchF _IO(MAGIC, 2)
+#define MAGIC '7'
+#define CONVERT _IO(MAGIC, 0)
+#define CREATE _IO(MAGIC, 1)
+#define SWITCH _IO(MAGIC, 2)
+#define STACK_SIZE (4096*2)
 
-#define STACK_SIZE (4096*2)  // 8KB
+typedef void (*entry_point)(void *param);
+
+typedef struct struct_process {
+    pid_t tgid; //Key
+    atomic_t total_fibers;
+    //DECLARE_HASHTABLE(threads, 10);
+    DECLARE_HASHTABLE(fibers, 10);
+    struct hlist_node table_node;
+} process;
 
 /**
  * Struct that defines a fiber in the system
@@ -60,12 +70,14 @@ struct pt_regs {
  * @field   struct pt_regs *regs describes the registers associated to a fiber 
  * @field   int fiber_id is the identifier of the fiber inside a specific thread
  */
-struct fiber {
-    struct pt_regs *regs;
+typedef struct struct_fiber {
+    spinlock_t lock;
+    struct pt_regs *context;
     int fiber_id;
-    atomic_t active;
-    void *param; //unused!
-};
+    int is_running; //Pid of the thread running the fiber or -1
+    pid_t tgid, parent_pid; //ridondanti?
+    struct hlist_node table_node;  
+} fiber;
 
 /**
  * Struct that handle the parameters that are passed from/to user space and kernel space through ioctl call
@@ -81,37 +93,8 @@ struct ioctl_params {
     unsigned long *sp, *bp;
     unsigned long user_func;
     int fiber_id;
+    pid_t thread_pid;
 };
-
-/**
- * Struct that describe an element in the hashtable threads that contains the threads that have at least one fiber.
- * An element of the hashtable is associated to one thread - that is the creator fiber
- * 
- * @field   atomic_t total fibers is the number of fibers part of the thread pid_t parent
- * @field   pid_t parent is the pid of the thread that is now a fiber
- * @field   struct fiber fiber
- */
-struct table_element_thread {
-    atomic_t total_fibers;
-    pid_t parent;
-    struct fiber *fiber;
-    struct hlist_node table_node;
-    DECLARE_HASHTABLE(fibers, 10); //Per-thread hashtable containing fibers created within thread
-};
-
-struct table_element_fiber {
-    struct fiber *fiber;
-    struct hlist_node table_node;
-};
-
-/*struct table_element {
-    atomic_t total_fibers;
-    pid_t parent;
-    struct fiber fiber;
-    struct hlist_node table_node;
-};
-*/
-
 /**
  * Method description.
  * @param param1 param1 description 
@@ -124,7 +107,7 @@ static long my_ioctl(struct file *, unsigned int, unsigned long);
 static char *unlock_sudo(struct device *, umode_t *);
 static int __init starting(void);
 static void __exit exiting(void);
-static int convertThreadToFiber(void);
-static int createFiber(struct ioctl_params *);
+static void *convertThreadToFiber(void);
+static void *createFiber(struct ioctl_params *);
 
 #endif
