@@ -10,13 +10,20 @@ int fd;
 
 /* TEST FUNCTIONS */
 int matteo(void **ciao){
+    //float mark;
+    //mark = 7.74473;
+    //mark += 7.1;
+    //printf("%f\n",mark);
 
     printf("Matteo\n");
     struct stru *prova;
     printf("Mariani\n");
     prova = (struct stru *) ciao;
 
+
     switchToFiber(3);
+    //mark += 7.1;
+    //printf("%f\n",mark);
 
     printf("Aprilia\n");
 
@@ -27,7 +34,11 @@ int matteo(void **ciao){
 }
 
 int riccardo(void **ciao){
-
+    //float mark;
+    //mark = 6.66666;
+    //mark += 0.1;
+    //printf("%f\n",mark);
+    
     printf("Riccardo\n");
     struct stru *prova;
     printf("Charetti\n");

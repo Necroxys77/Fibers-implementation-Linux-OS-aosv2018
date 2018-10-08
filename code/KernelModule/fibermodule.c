@@ -52,9 +52,11 @@ static void *convertThreadToFiber(void){
             /*Function that creates a fiber data structure given some parameters and inserts it in the hashtable????*/
             new_fiber = kmalloc(sizeof(fiber), GFP_KERNEL);
             new_fiber->context = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+            new_fiber->fpu_regs = kmalloc(sizeof(struct fpu), GFP_KERNEL);
 
             spin_lock_init(&(new_fiber->lock));
             memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+            copy_fxregs_to_kernel(new_fiber->fpu_regs);
             new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
             new_fiber->is_running = current->pid;
             new_fiber->tgid = current->tgid;
@@ -70,6 +72,7 @@ static void *convertThreadToFiber(void){
     new_process = kmalloc(sizeof(process), GFP_KERNEL);
     new_fiber = kmalloc(sizeof(fiber), GFP_KERNEL);
     new_fiber->context = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+    new_fiber->fpu_regs = kmalloc(sizeof(struct fpu), GFP_KERNEL);
 
     new_process->tgid = current->tgid; //Key
     atomic_set(&(new_process->total_fibers), 0);
@@ -78,6 +81,7 @@ static void *convertThreadToFiber(void){
 
     spin_lock_init(&(new_fiber->lock));
     memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+    copy_fxregs_to_kernel(new_fiber->fpu_regs);
     new_fiber->fiber_id = atomic_inc_return(&(new_process->total_fibers));
     new_fiber->is_running = current->pid;
     new_fiber->tgid = current->tgid;
@@ -106,9 +110,11 @@ static void *createFiber(struct ioctl_params *params){
                 if(current_fiber->parent_pid == current->pid){
                     new_fiber = kmalloc(sizeof(fiber), GFP_KERNEL);
                     new_fiber->context = kmalloc(sizeof(struct pt_regs), GFP_KERNEL);
+                    new_fiber->fpu_regs = kmalloc(sizeof(struct fpu), GFP_KERNEL);
                     
                     spin_lock_init(&(new_fiber->lock));
                     memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+                    copy_fxregs_to_kernel(new_fiber->fpu_regs);
                     new_fiber->context->sp = (unsigned long) (params->sp + STACK_SIZE - 1);
                     new_fiber->context->bp = new_fiber->context->sp;
                     new_fiber->context->ip = (unsigned long )params->user_func;
@@ -240,7 +246,7 @@ static void switchToFiber(struct ioctl_params *params){
                 calling_fiber->context->ip = old_context->ip; 
                 calling_fiber->context->bp = old_context->bp; 
                 calling_fiber->context->flags = old_context->flags;
-                //copy_fxregs_to_kernel(calling_fiber->fpu_regs);
+                copy_fxregs_to_kernel(calling_fiber->fpu_regs);
 
                 /* copying registers from the target fiber to current*/
                 old_context->r15 = target_fiber->context->r15;
@@ -261,7 +267,7 @@ static void switchToFiber(struct ioctl_params *params){
                 old_context->ip = target_fiber->context->ip;
                 old_context->bp = target_fiber->context->bp;
                 old_context->flags = target_fiber->context->flags;
-                //copy_kernel_to_fxregs(&(fiber->fpu_reg->state.fxsave))
+                copy_kernel_to_fxregs(&(target_fiber->fpu_regs->state.fxsave));
 
                 //releasing the calling fiber
                 calling_fiber->is_running = -1;

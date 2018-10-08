@@ -45,6 +45,7 @@ struct pt_regs {
 #include <linux/sched/task_stack.h>
 #include <linux/hashtable.h>    //Required for using linux implementation of hashtables 
 #include <linux/slab.h>
+#include <asm/fpu/internal.h>
 #include <asm/atomic.h>     //Required for using safe concurrency control
 #include <linux/spinlock.h>
 
@@ -72,7 +73,8 @@ typedef struct struct_process {
  */
 typedef struct struct_fiber {
     spinlock_t lock;
-    struct pt_regs *context;
+    struct pt_regs *context; //maybe copy is needed?
+    struct fpu *fpu_regs; //maybe copy is needed?
     int fiber_id;
     int is_running; //Pid of the thread running the fiber or -1
     pid_t tgid, parent_pid; //ridondanti?
