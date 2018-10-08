@@ -75,7 +75,7 @@ typedef struct struct_fiber {
     spinlock_t lock;
     struct pt_regs *context; //maybe copy is needed?
     struct fpu *fpu_regs; //maybe copy is needed?
-    int fiber_id;
+    unsigned long fiber_id;
     int is_running; //Pid of the thread running the fiber or -1
     pid_t tgid, parent_pid; //ridondanti?
     struct hlist_node table_node;  
@@ -94,7 +94,7 @@ struct ioctl_params {
     void **args;
     unsigned long *sp, *bp;
     unsigned long user_func;
-    int fiber_id;
+    unsigned long fiber_id;
     pid_t thread_pid;
 };
 /**

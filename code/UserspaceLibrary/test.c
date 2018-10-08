@@ -72,7 +72,7 @@ int fabrizio(void **ciao){
 int main(int argc, char const *argv[]){
     struct stru str;
     str.name = "prova_in_main";
-    int *a, *b, *c, *d, *e;
+    unsigned long a, b, c, d, e;
 
     fd = open("/dev/DeviceName", O_RDWR);
     if (fd < 0){
@@ -81,19 +81,19 @@ int main(int argc, char const *argv[]){
     }
 
     //should fail
-    //d =  (int *) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
+    //d =  (unsigned long) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
 
     //should fail
     //switchToFiber(5);
 
-    a = (int *) convertThreadToFiber();
+    a = (unsigned long) convertThreadToFiber();
 
     //should fail
-    //e = (int *) convertThreadToFiber();
+    //e = (unsigned long) convertThreadToFiber();
 
-    b = (int *) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
+    b = (unsigned long) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
 
-    c = (int *) createFiber(STACK_SIZE, (entry_point) riccardo, (void *) &str);
+    c = (unsigned long) createFiber(STACK_SIZE, (entry_point) riccardo, (void *) &str);
 
     //should fail
     //switchToFiber(99);

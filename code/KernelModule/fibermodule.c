@@ -33,9 +33,10 @@ static void *convertThreadToFiber(void){
     process *current_process, *new_process;
     fiber *new_fiber, *current_fiber;
     int f_index;
-    int *return_value; //necessary to handle return
+    unsigned long new_fiber_id = 0;
+    //int *return_value; //necessary to handle return
     
-    return_value = (int *) kmalloc(sizeof(int *), GFP_KERNEL);
+    //return_value = (int *) kmalloc(sizeof(int *), GFP_KERNEL);
 
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid) {
         //at least one "companion" thread of the calling thread has issued a convert before
@@ -43,10 +44,7 @@ static void *convertThreadToFiber(void){
             //Check if calling thread is already created a fiber --> if there exist already my pid
             //in the fibers data structure, i already issued convert
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if (current_fiber->parent_pid == current->pid){
-                    *return_value = 0;
-                    return return_value;
-                }
+                if (current_fiber->parent_pid == current->pid) return  (void *) new_fiber_id;
             }
             /*Here it means that thread has never issued convert (up to now) we need to create a new thread and fiber*/
             /*Function that creates a fiber data structure given some parameters and inserts it in the hashtable????*/
@@ -57,14 +55,13 @@ static void *convertThreadToFiber(void){
             spin_lock_init(&(new_fiber->lock));
             memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
             copy_fxregs_to_kernel(new_fiber->fpu_regs);
-            new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+            new_fiber->fiber_id = (unsigned long) atomic_inc_return(&(current_process->total_fibers));
             new_fiber->is_running = current->pid;
             new_fiber->tgid = current->tgid;
             new_fiber->parent_pid = current->pid;
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
             
-            *return_value = new_fiber->fiber_id;
-            return return_value;
+            return (void *) new_fiber->fiber_id;
         }
     }
 
@@ -82,16 +79,14 @@ static void *convertThreadToFiber(void){
     spin_lock_init(&(new_fiber->lock));
     memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
     copy_fxregs_to_kernel(new_fiber->fpu_regs);
-    new_fiber->fiber_id = atomic_inc_return(&(new_process->total_fibers));
+    new_fiber->fiber_id =  (unsigned long) atomic_inc_return(&(new_process->total_fibers));
     new_fiber->is_running = current->pid;
     new_fiber->tgid = current->tgid;
     new_fiber->parent_pid = current->pid;
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
 
-    *return_value = new_fiber->fiber_id;
-
     printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
-    return return_value;
+    return (void *) new_fiber->fiber_id;
 }
 
 
@@ -100,9 +95,10 @@ static void *createFiber(struct ioctl_params *params){
     process *current_process;
     int f_index;
     fiber *current_fiber, *new_fiber;
-    int *return_value;
+    //int *return_value;
+    unsigned long new_fiber_id = 0;
 
-    return_value = (int *) kmalloc(sizeof(int *), GFP_KERNEL);
+    //return_value = (int *) kmalloc(sizeof(int *), GFP_KERNEL);
 
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
         if (current_process->tgid == current->tgid){
@@ -119,24 +115,22 @@ static void *createFiber(struct ioctl_params *params){
                     new_fiber->context->bp = new_fiber->context->sp;
                     new_fiber->context->ip = (unsigned long )params->user_func;
                     new_fiber->context->di = (unsigned long) params->args;
-                    new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+                    new_fiber->fiber_id = (unsigned long) atomic_inc_return(&(current_process->total_fibers));
                     new_fiber->is_running = -1;
                     new_fiber->tgid = current->tgid;
                     new_fiber->parent_pid = current->pid;
                     hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
-                    printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, new_fiber->tgid, new_fiber->parent_pid);
-                    *return_value = new_fiber->fiber_id;
-                    return return_value; //thread issued convert so, it can create fibers
+                    printk(KERN_INFO "[-] New fiber created [id %lu, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, new_fiber->tgid, new_fiber->parent_pid);
+                    //*return_value = new_fiber->fiber_id;
+                    return (void *) new_fiber->fiber_id; //thread issued convert so, it can create fibers
                 }
             }
-            *return_value = 0;
             printk(KERN_INFO "[-] Any fibers of the caller thread found...\n");
-            return return_value; //process found, but thread not issued convert
+            return (void *) new_fiber_id; //process found, but thread not issued convert
         }
     }
-    *return_value = 0; //process not found
     printk(KERN_INFO "[-] Process not found...\n");
-    return return_value;
+    return (void *) new_fiber_id;  //process not found
 }
 
 /*
@@ -145,7 +139,6 @@ Returning the current one allow us to use a simple hash_for_each_possible_rcu in
 the fiber_id, directly
 */
 static fiber *can_switch(struct ioctl_params *params){
-    
     process *current_process;
     fiber *current_fiber;
     fiber *calling_fiber=NULL;
@@ -176,12 +169,10 @@ static fiber *can_switch(struct ioctl_params *params){
 /*
 It searches the target fiber
 */
-static fiber *search_target(int target_id){
-   
+static fiber *search_target(unsigned long target_id){
     process *current_process;
     fiber *current_fiber;
     fiber *target_fiber=NULL;
-    int f_index;
 
     //searching the process of the caller
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
@@ -216,11 +207,11 @@ static void switchToFiber(struct ioctl_params *params){
     //checking if the calling fiber can switch
     calling_fiber = can_switch(params);
     if (calling_fiber!=NULL){
-        printk(KERN_INFO "[-] Calling fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", calling_fiber->fiber_id, calling_fiber->tgid, calling_fiber->parent_pid, calling_fiber->is_running);
+        printk(KERN_INFO "[-] Calling fiber [id %lu, tgid %d, parent_pid %d, pid_running_thread %d] \n", calling_fiber->fiber_id, calling_fiber->tgid, calling_fiber->parent_pid, calling_fiber->is_running);
         //searching the target fiber
         target_fiber = search_target(params->fiber_id);
         if(target_fiber!=NULL){
-            printk(KERN_INFO "[-] Target fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", target_fiber->fiber_id, target_fiber->tgid, target_fiber->parent_pid, target_fiber->is_running);
+            printk(KERN_INFO "[-] Target fiber [id %lu, tgid %d, parent_pid %d, pid_running_thread %d] \n", target_fiber->fiber_id, target_fiber->tgid, target_fiber->parent_pid, target_fiber->is_running);
             spin_lock_irqsave(&(target_fiber->lock), flags);
             if(target_fiber->is_running == -1){
                 //switching...
@@ -274,16 +265,16 @@ static void switchToFiber(struct ioctl_params *params){
 
             } else {
                 printk(KERN_INFO "[-] Target fiber is already running somewhere\n");
-                params->fiber_id = -1; //if the target fiber is already running
+                params->fiber_id = 0; //if the target fiber is already running
             }
             spin_unlock_irqrestore(&(target_fiber->lock), flags);
         } else {
-            printk(KERN_INFO "[-] Target fiber %d doesn't exist\n", params->fiber_id);
-            params->fiber_id = -1; //if the target fiber doesn't exist
+            printk(KERN_INFO "[-] Target fiber %lu doesn't exist\n", params->fiber_id);
+            params->fiber_id = 0; //if the target fiber doesn't exist
         } 
     } else {
         printk(KERN_INFO "[-] Calling thread %d is not a fiber \n", current->pid);
-        params->fiber_id = -1; //if the calling thread is not a fiber
+        params->fiber_id = 0; //if the calling thread is not a fiber
     }
 }
 
@@ -291,7 +282,8 @@ static void switchToFiber(struct ioctl_params *params){
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
     struct ioctl_params *params;
-    int *return_value, value_to_user;
+    //int *return_value, 
+    unsigned long fiber_id;
 
     params = kmalloc(sizeof(struct ioctl_params), GFP_KERNEL);
     copy_from_user(params, (char *) arg, sizeof(struct ioctl_params));
@@ -299,50 +291,50 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     switch(cmd) {
         case CONVERT:
             printk(KERN_INFO "[-] Converting thread into a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
-            return_value = convertThreadToFiber();
+            fiber_id = (unsigned long) convertThreadToFiber();
 
-            if (!(*return_value)){
-                params->fiber_id = -1; //error
+            if (!fiber_id){
+                params->fiber_id = 0; //error
                 printk(KERN_ALERT "[!] Thread has already issued convertThreadToFiber! [tgid %d, pid %d]\n", current->tgid, current->pid);
             } else {
-                value_to_user = *return_value;
-                params->fiber_id = value_to_user;
+                //value_to_user = *return_value;
+                params->fiber_id = fiber_id;
                 printk(KERN_INFO "[+] convertThreadToFiber: succeded!\n");
             }
             //passing to user space some useful information
             copy_to_user((char *) arg, params, sizeof(struct ioctl_params));
             
-            kfree(return_value);
+            //kfree(return_value);
             kfree(params);
 
             break;
 
         case CREATE:
             printk(KERN_INFO "[-] Creating a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
-            return_value = createFiber(params);
+            fiber_id = (unsigned long) createFiber(params);
 
-            if (!(*return_value)){
-                params->fiber_id = -1; //error
+            if (!fiber_id){
+                params->fiber_id = 0; //error
                 printk(KERN_ALERT "[!] Thread not authorized to create fibers! convertThreadToFiber not issued yet!\n");
             } else {
-                value_to_user = *return_value;
-                params->fiber_id = value_to_user;
+                //value_to_user = *return_value;
+                params->fiber_id = fiber_id;
                 printk(KERN_INFO "[+] createFiber: succeded!\n");
             }
             //passing to user space some useful information
             copy_to_user((char *) arg, params, sizeof(struct ioctl_params));
 
-            kfree(return_value);
+            //kfree(return_value);
             kfree(params);  
 
             break;
 
         case SWITCH:
-            printk(KERN_INFO "[-] Switching to Fiber %d ...\n", params->fiber_id);
+            printk(KERN_INFO "[-] Switching to Fiber %lu ...\n", params->fiber_id);
             switchToFiber(params);
             //printk(KERN_INFO "params fiber id: %d\n", params->fiber_id);
             
-            if (params->fiber_id==-1) {
+            if (!params->fiber_id) {
                 printk(KERN_ALERT "[!] Impossible to switch to requested fiber!\n");
             } else printk(KERN_INFO "[+] switchToFiber: succeded!\n");
             //passing to user space some useful information
@@ -365,8 +357,9 @@ static void clean_up(void){
     hash_for_each_rcu(processes, p_index, current_process, table_node){
         printk(KERN_INFO "[-] Deleting fibers of process %d...", current_process->tgid);
         hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-            printk(KERN_INFO "[-] Deleting fiber %d...", current_fiber->fiber_id);
+            printk(KERN_INFO "[-] Deleting fiber %lu...", current_fiber->fiber_id);
             kfree(current_fiber->context);
+            kfree(current_fiber->fpu_regs);
             hash_del_rcu(&(current_fiber->table_node));
             kfree(current_fiber);
         }

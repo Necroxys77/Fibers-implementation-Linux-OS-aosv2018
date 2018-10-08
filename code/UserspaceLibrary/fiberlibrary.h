@@ -31,7 +31,7 @@ struct ioctl_params {
     unsigned long *sp;
     unsigned long *bp;
     entry_point user_func;
-    int fiber_id;
+    unsigned long fiber_id;
 };
 
 /**
