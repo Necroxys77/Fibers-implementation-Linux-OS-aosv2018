@@ -1,4 +1,4 @@
-#include "fiberlibrary.c"
+#include "fiberlib.c"
 
 //test
 struct stru {
@@ -10,11 +10,13 @@ int fd;
 
 /* TEST FUNCTIONS */
 int matteo(void **ciao){
-    //float mark;
-    //mark = 7.74473;
-    //mark += 7.1;
-    //printf("%f\n",mark);
+    float mark;
+    long pos;
+    mark = 7.74473;
+    mark += 7.1;
+    printf("%f\n",mark);
 
+    pos = flsAlloc();
     printf("Matteo\n");
     struct stru *prova;
     printf("Mariani\n");
@@ -22,22 +24,22 @@ int matteo(void **ciao){
 
 
     switchToFiber(3);
-    //mark += 7.1;
-    //printf("%f\n",mark);
+    mark += 7.1;
+    printf("%f\n",mark);
 
     printf("Aprilia\n");
 
     switchToFiber(1);
     printf("%s\n", prova->name);
     
-    exit(0); //Note that fibers don't return or exit!
+    //exit(0); //Note that fibers don't return or exit!
 }
 
 int riccardo(void **ciao){
-    //float mark;
-    //mark = 6.66666;
-    //mark += 0.1;
-    //printf("%f\n",mark);
+    float mark;
+    mark = 6.66666;
+    mark += 0.1;
+    printf("%f\n",mark);
     
     printf("Riccardo\n");
     struct stru *prova;
@@ -60,7 +62,7 @@ int fabrizio(void **ciao){
     printf("Rossi\n");
     prova = (struct stru *) ciao;
 
-    switchToFiber(2);
+    //switchToFiber(2);
     printf("Milano\n");
 
     printf("%s\n", prova->name);
@@ -96,7 +98,7 @@ int main(int argc, char const *argv[]){
     c = (unsigned long) createFiber(STACK_SIZE, (entry_point) riccardo, (void *) &str);
 
     //should fail
-    //switchToFiber(99);
+    switchToFiber(99);
 
     //let's dance...
     switchToFiber(2);
