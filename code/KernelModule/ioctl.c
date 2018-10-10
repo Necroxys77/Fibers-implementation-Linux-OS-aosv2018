@@ -29,6 +29,7 @@ static char *unlock_sudo(struct device *dev, umode_t *mode){
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     int fiber_id, success;
     long pos;
+    void *value;
     struct ioctl_params *params;
 
     switch(cmd){
@@ -89,17 +90,54 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
             return pos;
 
-        case FLSGET:
-
-            return 0;
-        
         case FLSSET:
+            params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
+            if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
+                kfree(params);
+                return 0; //error copy failed
+            }
 
-            return 0;
+            success = flsSet(params->pos, params->value);
+            if(success)
+                 printk(KERN_INFO "[+] flsSet: succeded! value %lld to pos %ld\n", params->value, params->pos);
+            else
+                printk(KERN_INFO "[!] flsSet: failed! value %lld to pos %ld\n", params->value, params->pos);
+
+            kfree(params);
+            return success;
+
+        case FLSGET:
+            params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
+            if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
+                kfree(params);
+                return 0; //error copy failed
+            }
+            
+            value = (void *) flsGet(params->pos);
+            if(value!=NULL)
+                printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
+            else
+                printk(KERN_INFO "[!] flsGet: failed! pos %ld\n",params->pos);
+
+            kfree(params);
+            return value;
 
         case FLSFREE:
 
-            return 0;
+            params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
+            if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
+                kfree(params);
+                return 0; //error copy failed
+            }
+
+            success = flsFree(params->pos);
+            if(success)
+                 printk(KERN_INFO "[+] flsFree: succeded! pos %ld\n", params->pos);
+            else
+                printk(KERN_INFO "[!] flsFree: failed! pos %ld\n", params->pos);
+
+            kfree(params);
+            return success;
     }
 
     return -1;

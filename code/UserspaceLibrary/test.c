@@ -11,12 +11,22 @@ int fd;
 /* TEST FUNCTIONS */
 int matteo(void **ciao){
     float mark;
-    long pos;
+    long pos,pos2;
+    long long val, val2;
+
     mark = 7.74473;
     mark += 7.1;
     printf("%f\n",mark);
 
     pos = flsAlloc();
+    pos2 = flsAlloc();
+    val = (long long) 77;
+    flsSet(pos,val);
+    //flsSet(999,val); //CASE TO HANDLE! See flsSet description into fiber.c
+    val2 = flsGet(pos);
+    //flsGet(21);
+
+    
     printf("Matteo\n");
     struct stru *prova;
     printf("Mariani\n");
@@ -98,7 +108,7 @@ int main(int argc, char const *argv[]){
     c = (unsigned long) createFiber(STACK_SIZE, (entry_point) riccardo, (void *) &str);
 
     //should fail
-    switchToFiber(99);
+    //switchToFiber(99);
 
     //let's dance...
     switchToFiber(2);

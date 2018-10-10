@@ -69,8 +69,74 @@ long flsAlloc(){
     long pos;
     
     pos = ioctl(fd, FLSALLOC, NULL);
-    if(pos == -1)
-        printf("[!] Fail...");
-
+    if(pos != -1)
+        printf("[+] Retrieved position %ld from the fls\n", pos);
+    else
+        printf("[!] Failed to retrieve a position in the fls...");
     return pos;
+}
+
+
+void flsSet(long pos, long long value){
+    int success;
+
+    if(pos < 0)
+        printf("[!] flsSet pos is negative\n");
+    else {
+
+        struct ioctl_params params = {
+            .pos = pos,
+            .value = value
+        };
+
+        success = ioctl(fd, FLSSET, &params);
+        if(success)
+            printf("[+] Value %lld is put at position %ld\n", value, pos);
+        else
+            printf("[!] Error while setting the value\n");
+    }
+}
+
+
+long long flsGet(long pos){
+    void *value;
+
+    if(pos < 0)
+        printf("[!] flsGet pos is negative\n");
+    else {
+
+        struct ioctl_params params = {
+            .pos = pos,
+        };
+
+        value = (void *) ioctl(fd, FLSGET, &params);
+        if(value!=NULL)
+            printf("[+] Value %lld is retrieved from position %ld\n", (long long) value, pos);
+        else
+            printf("[!] Error while retrieving the value\n");
+    }
+    
+    return (long long) value;
+}
+
+
+bool flsFree(long pos){
+    bool success = false;
+
+    if(pos < 0)
+        printf("[!] flsGet pos is negative\n");
+    else {
+
+        struct ioctl_params params = {
+            .pos = pos,
+        };
+
+        if(ioctl(fd, FLSFREE, &params)){
+            printf("[+] Position %ld freed form fls!\n", pos);
+            success = true;
+        } else
+            printf("[!] Error while freeing the value in position %ld\n", pos);
+    }
+
+    return success;
 }

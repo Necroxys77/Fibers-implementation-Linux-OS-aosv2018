@@ -55,10 +55,10 @@ int switchToFiber(int);
 
 long long flsGet(long);
 
-bool flsFree(long);
+int flsFree(long);
 
 long flsAlloc(void);
 
-void flsSet(long, long long);
+int flsSet(long, long long);
 
 #endif

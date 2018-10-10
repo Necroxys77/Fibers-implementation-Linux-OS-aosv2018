@@ -209,6 +209,8 @@ int switchToFiber(int target_fiber_id){
     return success;
 }
 
+
+//FLS ALLOC
 long flsAlloc(){
     process *current_process;
     fiber *current_fiber;
@@ -221,7 +223,7 @@ long flsAlloc(){
                 if(current_fiber->running_by == current->pid){
                     pos = find_first_zero_bit(current_fiber->fls_bitmap, MAX_SIZE_FLS);
                     if (pos == MAX_SIZE_FLS){
-                        printk(KERN_ALERT "[!] FLS full for fiber %d\n", current_fiber->fiber_id);
+                        printk(KERN_ALERT "[!] fls full for fiber %d\n", current_fiber->fiber_id);
                         return -1;
                     }
                     change_bit(pos, current_fiber->fls_bitmap);
@@ -230,5 +232,77 @@ long flsAlloc(){
             }
         }
     }
+    printk(KERN_ALERT "[!] Process/fiber doesn't found in the hashtable...\n");
     return -1; //process/fiber not found
+}
+
+
+//FLS SET
+// possible problems, 
+// (1) if flsSet fails then the bit on the bitmap should be changed again since the position is not used anymore.
+// (2) if the user pass any pos, i can overwrite that position since we don't apply any check.
+// there should be something like:    test_bit(pos, current_fiber->fls_bitmap) && *current_fiber->fls[pos]=**original_value_bitmap**)
+//BUT, what is **original_value_bitmap**?
+int flsSet(long pos, long long value){
+    process *current_process;
+    fiber *current_fiber;
+    int f_index;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
+        if(current->tgid == current_process->tgid){
+            hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+                if(current_fiber->running_by == current->pid){
+                    current_fiber->fls[pos] = value;
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
+
+//FLS GET
+long long flsGet(long pos){
+    void *value = NULL;
+    process *current_process;
+    fiber *current_fiber;
+    int f_index;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
+        if(current->tgid == current_process->tgid){
+            hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+                if(current_fiber->running_by == current->pid){
+                    if(test_bit(pos, current_fiber->fls_bitmap)){ //if that position is valid, ok
+                        return current_fiber->fls[pos];
+                    } else 
+                        return value;
+                }
+            }
+        }
+    }
+    return value;
+}
+
+
+//FLS FREE
+int flsFree(long pos){
+    process *current_process;
+    fiber *current_fiber;
+    int f_index;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
+        if(current->tgid == current_process->tgid){
+            hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+                if(current_fiber->running_by == current->pid){
+                    //TO FILL
+                    return 0;
+
+
+                }
+            }
+        }
+    }
+
+    return 0;
 }
