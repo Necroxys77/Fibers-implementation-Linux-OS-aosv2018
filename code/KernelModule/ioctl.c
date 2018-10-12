@@ -1,14 +1,12 @@
 #include "ioctl.h"
 
-
 //static DEFINE_HASHTABLE(processes, 10); //QUI?
-
 static int majorNumber;
 static struct class* charClass  = NULL; // The device-driver class struct pointer
 static struct device* charDevice = NULL; // The device-driver device struct pointer
+struct kprobe kp;
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
-
 
 static struct file_operations fops =
 {
@@ -114,13 +112,16 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             }
             
             value = (void *) flsGet(params->pos);
-            if(value!=NULL)
+            if(value!=NULL){
                 printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
-            else
+                params->value = (long long) value; success = 1;
+            } else{
                 printk(KERN_INFO "[!] flsGet: failed! pos %ld\n",params->pos);
+                success = 0;
+            }
 
             kfree(params);
-            return value;
+            return success;
 
         case FLSFREE:
 
@@ -145,6 +146,9 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
 
 
 static int __init starting(void){
+
+    int ret_probe;
+
     printk(KERN_INFO "We are in _init!\n");
     /* 
         Try to dynamically allocate a major number for the device
@@ -178,6 +182,12 @@ static int __init starting(void){
         return PTR_ERR(charDevice);
     }
 
+    /*Registering Kprobes*/
+    memset(&kp, 0, sizeof(kp));
+    if ((ret_probe = register_doexit_probe(&kp)) < 0){
+        printk(KERN_ALERT "In init, failed to register probe!\n");
+    }
+
     printk(KERN_INFO "Device class created correctly, __init finished!\n"); // Made it! device was initialized
     return 0;
 }
@@ -190,6 +200,7 @@ static void __exit exiting(void){
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class
     unregister_chrdev(majorNumber, "DeviceName");             // unregister the major number
+    unregister_doexit_probe(&kp);
     printk(KERN_INFO "Goodbye from the LKM!\n");
 }
 

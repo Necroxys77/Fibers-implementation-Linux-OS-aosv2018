@@ -1,7 +1,6 @@
 #ifndef ioctlm
 #define ioctlm
-
-//REFACTORING INCLUDE
+/*
 #include <linux/init.h>           // Macros used to mark up functions e.g. __init __exit
 #include <linux/module.h>         // Core header for loading LKMs into the kernel
 #include <linux/device.h>         // Header to support the kernel Driver Model
@@ -15,6 +14,9 @@
 #include <asm/atomic.h>     //Required for using safe concurrency control
 #include <linux/spinlock.h>
 #include "fiber.h"
+*/
+#include "fiber.h"
+#include "kprobehandlers.h"
 
 #define MAGIC '7'
 #define CONVERT _IO(MAGIC, 0)

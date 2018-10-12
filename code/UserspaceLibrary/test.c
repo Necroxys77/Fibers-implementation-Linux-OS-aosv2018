@@ -19,12 +19,15 @@ int matteo(void **ciao){
     printf("%f\n",mark);
 
     pos = flsAlloc();
-    pos2 = flsAlloc();
+    //pos2 = flsAlloc();
     val = (long long) 77;
     flsSet(pos,val);
+    flsSet(3,(long long) 34);
     //flsSet(999,val); //CASE TO HANDLE! See flsSet description into fiber.c
-    val2 = flsGet(pos);
+    val2 = flsGet(3);
     //flsGet(21);
+    flsFree(pos);
+    flsFree(3);
 
     
     printf("Matteo\n");
@@ -85,6 +88,8 @@ int main(int argc, char const *argv[]){
     struct stru str;
     str.name = "prova_in_main";
     unsigned long a, b, c, d, e;
+
+    printf("My pid is : %d\n", getpid());
 
     fd = open("/dev/DeviceName", O_RDWR);
     if (fd < 0){

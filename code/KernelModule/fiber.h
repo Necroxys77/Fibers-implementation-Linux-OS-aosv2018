@@ -1,7 +1,6 @@
 #ifndef FIBER
 #define FIBER
 
-//REFACTORING INCLUDE
 #include <linux/init.h>           // Macros used to mark up functions e.g. __init __exit
 #include <linux/module.h>         // Core header for loading LKMs into the kernel
 #include <linux/device.h>         // Header to support the kernel Driver Model
@@ -14,6 +13,7 @@
 #include <asm/fpu/internal.h>
 #include <asm/atomic.h>     //Required for using safe concurrency control
 #include <linux/spinlock.h>
+
 #include <linux/bitmap.h>
 #include <linux/types.h>
 
@@ -35,7 +35,7 @@ typedef struct {
     spinlock_t lock;
     struct pt_regs *context;
     struct fpu *fpu_regs;
-    int fiber_id;
+    int fiber_id, finalized_activations, failed_activations;
     long long fls[MAX_SIZE_FLS];
     DECLARE_BITMAP(fls_bitmap, MAX_SIZE_FLS);
     pid_t parent_pid, running_by;

@@ -1,6 +1,5 @@
 #include "fiber.h"
 
-
 DEFINE_HASHTABLE(processes, 10);
 
 //CONVERT
@@ -28,7 +27,9 @@ int convertThreadToFiber(void){
             new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
             new_fiber->running_by = current->pid;
             new_fiber->parent_pid = current->pid;
-            
+            new_fiber->finalized_activations = 1;
+            new_fiber->failed_activations = 0;
+
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
             
             return new_fiber->fiber_id;
@@ -53,6 +54,8 @@ int convertThreadToFiber(void){
     new_fiber->fiber_id = atomic_inc_return(&(new_process->total_fibers));
     new_fiber->running_by = current->pid;
     new_fiber->parent_pid = current->pid;
+    new_fiber->finalized_activations = 1;
+    new_fiber->failed_activations = 0;
     
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
     
@@ -89,6 +92,8 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
                     new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
                     new_fiber->running_by = -1; //pid_t can be -1?
                     new_fiber->parent_pid = current->pid;
+                    new_fiber->finalized_activations = 0;
+                    new_fiber->failed_activations = 0;
 
                     hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
                     printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
@@ -195,11 +200,16 @@ int switchToFiber(int target_fiber_id){
                 memcpy(old_context, target_fiber->context, sizeof(struct pt_regs));
                 copy_kernel_to_fxregs(&(target_fiber->fpu_regs->state.fxsave));
 
+                //For statistics
+                target_fiber->finalized_activations += 1;
+
                 //realising calling fiber
                 calling_fiber->running_by = -1;
                 success = 1;
-            } else
+            } else{
                 printk(KERN_INFO "[-] Target fiber is already running by %d\n", target_fiber->running_by);
+                target_fiber->failed_activations += 1;
+            }
             spin_unlock_irqrestore(&(target_fiber->lock), flags);
         } else
             printk(KERN_INFO "[-] Target fiber %d doesn't exist\n", target_fiber_id);
@@ -236,13 +246,17 @@ long flsAlloc(){
     return -1; //process/fiber not found
 }
 
-
 //FLS SET
 // possible problems, 
 // (1) if flsSet fails then the bit on the bitmap should be changed again since the position is not used anymore.
 // (2) if the user pass any pos, i can overwrite that position since we don't apply any check.
-// there should be something like:    test_bit(pos, current_fiber->fls_bitmap) && *current_fiber->fls[pos]=**original_value_bitmap**)
+// there should be something like: test_bit(pos, current_fiber->fls_bitmap) && *current_fiber->fls[pos]=**original_value_bitmap**)
 //BUT, what is **original_value_bitmap**?
+
+/*Riccardo's answer:
+We cannot do (1) because that position has been allocated by flsAlloc() so, it is still allocated. By the way, flsSet() cannot fail.
+For (2), we can only check if the corresponding bit is set to 1 which means that the alloc has "allocated" it.
+*/
 int flsSet(long pos, long long value){
     process *current_process;
     fiber *current_fiber;
@@ -251,7 +265,7 @@ int flsSet(long pos, long long value){
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
         if(current->tgid == current_process->tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if(current_fiber->running_by == current->pid){
+                if(current_fiber->running_by == current->pid && test_bit(pos, current_fiber->fls_bitmap)){
                     current_fiber->fls[pos] = value;
                     return 1;
                 }
@@ -264,7 +278,7 @@ int flsSet(long pos, long long value){
 
 //FLS GET
 long long flsGet(long pos){
-    void *value = NULL;
+    //void *value = NULL;
     process *current_process;
     fiber *current_fiber;
     int f_index;
@@ -272,18 +286,15 @@ long long flsGet(long pos){
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
         if(current->tgid == current_process->tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if(current_fiber->running_by == current->pid){
-                    if(test_bit(pos, current_fiber->fls_bitmap)){ //if that position is valid, ok
-                        return current_fiber->fls[pos];
-                    } else 
-                        return value;
-                }
+                if(current_fiber->running_by == current->pid && test_bit(pos, current_fiber->fls_bitmap))
+                    return current_fiber->fls[pos];
+                else 
+                    return (long long) NULL;
             }
         }
     }
-    return value;
+    return (long long) NULL;
 }
-
 
 //FLS FREE
 int flsFree(long pos){
@@ -294,11 +305,10 @@ int flsFree(long pos){
     hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
         if(current->tgid == current_process->tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if(current_fiber->running_by == current->pid){
-                    //TO FILL
-                    return 0;
-
-
+                //Need to check if the bit is set, otherwise it has no sense to free it
+                if(current_fiber->running_by == current->pid && test_bit(pos, current_fiber->fls_bitmap)){
+                    change_bit(pos, current_fiber->fls_bitmap);
+                    return 1;
                 }
             }
         }
