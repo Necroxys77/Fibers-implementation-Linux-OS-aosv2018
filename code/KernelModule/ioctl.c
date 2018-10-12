@@ -4,7 +4,8 @@
 static int majorNumber;
 static struct class* charClass  = NULL; // The device-driver class struct pointer
 static struct device* charDevice = NULL; // The device-driver device struct pointer
-struct kprobe kp;
+struct kprobe kp_do_exit;
+struct kretprobe kp_schedule;
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
@@ -183,13 +184,39 @@ static int __init starting(void){
     }
 
     /*Registering Kprobes*/
-    memset(&kp, 0, sizeof(kp));
-    if ((ret_probe = register_doexit_probe(&kp)) < 0){
+    memset(&kp_do_exit, 0, sizeof(kp_do_exit));
+    if ((ret_probe = register_kp(&kp_do_exit, 'e')) < 0){
         printk(KERN_ALERT "In init, failed to register probe!\n");
+    }
+
+    memset(&kp_schedule, 0, sizeof(kp_schedule));
+    if ((ret_probe = register_kretp(&kp_schedule)) < 0){
+        printk(KERN_ALERT "In init, failed to register kretprobe!\n");
     }
 
     printk(KERN_INFO "Device class created correctly, __init finished!\n"); // Made it! device was initialized
     return 0;
+}
+
+int clean_up_data(void){
+    fiber *current_fiber;
+    process *current_process;
+    int f_index, p_index;
+
+    hash_for_each_rcu(processes, p_index, current_process, table_node){
+        printk(KERN_INFO "[-] Deleting process %d", current_process->tgid);
+
+        hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+            printk(KERN_INFO "[-] Deleting fiber %d", current_fiber->fiber_id);
+            kfree(current_fiber->context);
+            kfree(current_fiber->fpu_regs);
+            hash_del_rcu(&(current_fiber->table_node));
+        }
+
+        hash_del_rcu(&(current_process->table_node));
+    }
+    printk(KERN_INFO "[+] All cleaned!");
+    return 1;
 }
 
 static void __exit exiting(void){
@@ -200,7 +227,8 @@ static void __exit exiting(void){
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class
     unregister_chrdev(majorNumber, "DeviceName");             // unregister the major number
-    unregister_doexit_probe(&kp);
+    unregister_kp(&kp_do_exit);
+    unregister_kretp(&kp_schedule);
     printk(KERN_INFO "Goodbye from the LKM!\n");
 }
 

@@ -1,6 +1,7 @@
 #include "fiber.h"
 
 DEFINE_HASHTABLE(processes, 10);
+//EXPORT_SYMBOL(processes);
 
 //CONVERT
 int convertThreadToFiber(void){
