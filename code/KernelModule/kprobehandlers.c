@@ -30,24 +30,33 @@ void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
 }
 
 struct my_data {
-    pid_t pid;
+    pid_t p;
 };
 
 int pre_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
-    struct my_data *d = (struct my_data *) ri->data;
-    d->pid = current->pid;
-    ri->data->pid = current->pid;
-    printk("PreHandler schedule(): pid %d\n", ri->data->pid);
+
+    struct my_data *p;
+    //ri->data = p;
+    p = (struct my_data *) ri->data;
+    p->p = current->pid;
+    //ri->data[0] = (char *) p;
+
+    //printk("PreHandler schedule(): pid %d\n", current->pid);
     return 0; 
 }
 
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 int post_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
-    if (ri->data->pid != current->pid)
-        printk("OOOOOOK\n");
-    struct my_data *d = (struct my_data *) ri->data;
-    printk("PostHandler schedule(): pid %d\n", d->pid);
+
+    struct my_data *r;
+    r = (struct my_data *) ri->data;
+    
+    if(current->pid != r->p){
+        printk("SI\n");
+    }
+
+    //printk("PostHandler schedule(): pid %d, %d\n", r->p, current->pid);
     return 0;
 }
 
@@ -78,7 +87,8 @@ int register_kretp(struct kretprobe *kretp){
     kretp->handler = post_schedule;
     kretp->entry_handler = pre_schedule;
     kretp->kp.symbol_name = "__schedule";
-    kretp->data_size = sizeof(struct my_data);
+    kretp->data_size = sizeof(struct my_data *);
+    kretp->maxactive = 20;
 
     if (!register_kretprobe(kretp)) {
         printk(KERN_INFO "[+] Kretprobe registered!\n");

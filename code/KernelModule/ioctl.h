@@ -41,12 +41,10 @@ static long my_ioctl(struct file *, unsigned int, unsigned long);
 
 static char *unlock_sudo(struct device *, umode_t *);
 
-int clean_up_data(void)
+int clean_up_data(void);
 
 static int __init starting(void);
 
 static void __exit exiting(void);
-
-
 
 #endif

@@ -198,7 +198,7 @@ static int __init starting(void){
     return 0;
 }
 
-int clean_up_data(void){
+/*int clean_up_data(void){
     fiber *current_fiber;
     process *current_process;
     int f_index, p_index;
@@ -217,7 +217,7 @@ int clean_up_data(void){
     }
     printk(KERN_INFO "[+] All cleaned!");
     return 1;
-}
+}*/
 
 static void __exit exiting(void){
     printk(KERN_INFO "We are exiting..\n");
