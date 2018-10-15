@@ -13,14 +13,12 @@
 #include <asm/fpu/internal.h>
 #include <asm/atomic.h>     //Required for using safe concurrency control
 #include <linux/spinlock.h>
-
 #include <linux/bitmap.h>
 #include <linux/types.h>
 
 #define MAX_SIZE_FLS (4096)
 #define STACK_SIZE (4096*2)
 
-//
 
 typedef void (*entry_point)(void *param);
 
@@ -62,5 +60,10 @@ int flsFree(long);
 long flsAlloc(void);
 
 int flsSet(long, long long);
+
+void clean_up(void);
+
+fiber *get_running_fiber(void);
+
 
 #endif

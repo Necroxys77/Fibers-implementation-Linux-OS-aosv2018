@@ -184,10 +184,12 @@ static int __init starting(void){
     }
 
     /*Registering Kprobes*/
+    /*
     memset(&kp_do_exit, 0, sizeof(kp_do_exit));
     if ((ret_probe = register_kp(&kp_do_exit, 'e')) < 0){
         printk(KERN_ALERT "In init, failed to register probe!\n");
     }
+    */
 
     memset(&kp_schedule, 0, sizeof(kp_schedule));
     if ((ret_probe = register_kretp(&kp_schedule)) < 0){
@@ -198,31 +200,10 @@ static int __init starting(void){
     return 0;
 }
 
-/*int clean_up_data(void){
-    fiber *current_fiber;
-    process *current_process;
-    int f_index, p_index;
-
-    hash_for_each_rcu(processes, p_index, current_process, table_node){
-        printk(KERN_INFO "[-] Deleting process %d", current_process->tgid);
-
-        hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-            printk(KERN_INFO "[-] Deleting fiber %d", current_fiber->fiber_id);
-            kfree(current_fiber->context);
-            kfree(current_fiber->fpu_regs);
-            hash_del_rcu(&(current_fiber->table_node));
-        }
-
-        hash_del_rcu(&(current_process->table_node));
-    }
-    printk(KERN_INFO "[+] All cleaned!");
-    return 1;
-}*/
 
 static void __exit exiting(void){
     printk(KERN_INFO "We are exiting..\n");
-    //clean_up();
-    //printk(KERN_INFO "Finished to clean up all data structures: %d\n", clean_up_err);
+    clean_up();
     device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class

@@ -1,7 +1,7 @@
 #include "fiber.h"
 
 DEFINE_HASHTABLE(processes, 10);
-//EXPORT_SYMBOL(processes);
+
 
 //CONVERT
 int convertThreadToFiber(void){
@@ -316,4 +316,48 @@ int flsFree(long pos){
     }
 
     return 0;
+}
+
+
+//CLEAN
+//it removes all data structures allocated for the module.
+//This function has to be here to obtain visibility for the hashtable processes
+void clean_up(){
+    fiber *current_fiber;
+    process *current_process;
+    int f_index, p_index;
+    
+    hash_for_each_rcu(processes, p_index, current_process, table_node){
+        printk(KERN_INFO "[-] Deleting process %d", current_process->tgid);
+        hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+            printk(KERN_INFO "[-] Deleting fiber %d", current_fiber->fiber_id);
+            kfree(current_fiber->context);
+            kfree(current_fiber->fpu_regs);
+            hash_del_rcu(&(current_fiber->table_node));
+        }
+        hash_del_rcu(&(current_process->table_node));
+    }
+    printk(KERN_INFO "[+] All cleaned!");
+
+}
+
+
+
+//GET RUNNING FIBER OF CURRENT THREAD
+fiber *get_running_fiber(){
+    process *current_process;
+    fiber *current_fiber;
+    int f_index;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, current->tgid){
+        if(current_process->tgid == current->tgid){
+            hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+                if(current_fiber->running_by == current->pid){
+                    return current_fiber;
+                }
+            }
+        }
+    }
+    
+    return NULL;
 }
