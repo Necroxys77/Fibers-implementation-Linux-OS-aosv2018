@@ -1,106 +1,72 @@
 #include "kprobehandlers.h"
 
-int counterp = 0;
-int counterpo = 0;
-
-/*
-int pre_do_exit(struct kprobe *p, struct pt_regs *regs){
-    printk("PreHandler: counter = %d, pid %d\n",counter++, current->pid);
-    return 0; 
-}
-*/
-
+DEFINE_PER_CPU(struct task_struct *, prev) = NULL;
 
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
     fiber *current_fiber;
+    struct timespec current_time;
+    int need_clean;
 
-    current_fiber = get_running_fiber();
-    if (current_fiber != NULL){
-        printk(KERN_INFO "Thread %d with tgid %d exited, fiber %d runned by %d\n", current->pid, current->tgid, current_fiber->fiber_id, current_fiber->running_by);
+    current_fiber = get_running_fiber(&need_clean);
+    if(need_clean == 1)
+        remove_process(current->tgid);
+    else if ((current_fiber != NULL)) {
+        //printk(KERN_INFO "Thread %d with tgid %d exited, fiber %d runned by %d\n", current->pid, current->tgid, current_fiber->fiber_id, current_fiber->running_by);
         current_fiber->running_by = -1;
+        memset(&current_time, 0, sizeof(struct timespec));
+        getnstimeofday(&current_time);
+        current_fiber->exec_time += (current_time.tv_nsec - current_fiber->start_time);
     }
-    printk("PostHandler do_exit: eseguito\n");
-}
 
-struct my_data {
-    pid_t p;
-    unsigned int cpu;
-};
-
-int pre_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
-    struct my_data *dat;
-    //ri->data = dat;
-    dat = (struct my_data *) ri->data;
-    //ri->data[0] = (char *) dat;
-    
-    if (counterp==0){
-        printk(KERN_INFO "PRE: %d\n", current->pid);
-        counterp++;
-        dat->p = current->pid;
-        dat->cpu = current->cpu;
-    } else{
-        dat->p = 0;
-        dat->cpu = 99;
-    }
-    //struct my_data *p;
-    //ri->data = p;
-    //p = (struct my_data *) ri->data;
-    //p->p = current->pid;
-    //ri->data[0] = (char *) p;
-
-    //printk("PreHandler schedule(): pid %d\n", current->pid);
-    return 0; 
+    //printk("PostHandler do_exit: eseguito %d\n", current->pid);
 }
 
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 int post_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
 
-    struct my_data *r;
-    r = (struct my_data *) ri->data;
-    
-    if (counterpo==0  && (r->cpu == current->cpu)){
-        printk(KERN_INFO "POST: %d, %d, %ud\n", current->pid, r->p, r->cpu);
-        counterpo++;
+    struct task_struct *prev_task = get_cpu_var(prev);
+
+    if (prev_task == NULL){
+        this_cpu_write(prev, current);
+        put_cpu_var(prev);
+        prev_task = get_cpu_var(prev);
+        //printk(KERN_INFO "tgid current %d cpu %d, tgid prev_task %d cpu %d", current->pid, current->cpu, prev_task->pid, prev_task->cpu);
+        put_cpu_var(prev);
+        return 0;
     }
-    //printk("PostHandler schedule(): pid %d, %d\n", r->p, current->pid);
+
+    //printk(KERN_INFO "tgid current %d cpu %d, tgid prev_task %d cpu %d", current->pid, current->cpu, prev_task->pid, prev_task->cpu);
+    update_timer(prev_task, current);
+    this_cpu_write(prev, current);
+    put_cpu_var(prev);
+
     return 0;
 }
 
-
-
-int register_kp(struct kprobe *kp, char function){
+int register_kp(struct kprobe *kp){
     
-    if (function == 'e'){
-        kp->addr = (kprobe_opcode_t *) do_exit; 
-        //kp->pre_handler = pre_do_exit; 
-        kp->post_handler = post_do_exit;
-    }
-    /*if (function == 's'){
-        kp->addr = (kprobe_opcode_t *) schedule; 
-        kp->pre_handler = pre_schedule; 
-        kp->post_handler = post_schedule;
-    }*/
+    kp->addr = (kprobe_opcode_t *) do_exit; 
+    //kp->pre_handler = pre_do_exit; 
+    kp->post_handler = post_do_exit;
 
     if (!register_kprobe(kp)) {
-        printk(KERN_INFO "[+] Kprobe registered for %c!\n", function);
+        printk(KERN_INFO "[+] Kprobe registered for do_exit!\n");
 		return 1;
 	} else {
-        printk(KERN_ALERT "[!] Registering Kprobe for %c has failed!\n", function);
+        printk(KERN_ALERT "[!] Registering Kprobe for do_exit has failed!\n");
 		return -2;
 	}
 }
 
+/* kallsyms_lookup_name("proc_pident_lookup") */
 
 int register_kretp(struct kretprobe *kretp){
 
     kretp->handler = post_schedule;
-    kretp->entry_handler = pre_schedule;
-    kretp->kp.symbol_name = "__schedule";
-    kretp->data_size = sizeof(struct my_data *);
-    //kretp->maxactive = 20;
+    kretp->kp.symbol_name = "finish_task_switch";
 
     if (!register_kretprobe(kretp)) {
         printk(KERN_INFO "[+] Kretprobe registered!\n");
@@ -111,6 +77,19 @@ int register_kretp(struct kretprobe *kretp){
 	}
 }
 
+static int my_func(struct file *file, struct dir_context *ctx, const struct pid_entry *ents, unsigned int nents){
+
+    //struct pid_entry *x;
+    //x = (struct pid_entry *) kmalloc(sizeof(struct pide_entry *), GFP_KERNEL);
+    //memcpy(x, ents, sizeof(ents));
+    struct proc_inode *x = container_of(file->f_inode, struct proc_inode, vfs_inode);
+    struct task_struct *task = get_pid_task(x->pid,  PIDTYPE_PID);
+    //struct task_struct *task = get_proc_task(file_inode(file));
+    //struct inode *i = file->f_inode;
+    printk("Caiooo %d\n", task->pid);
+    //printk("%s\n", x->name);
+    return 1;
+}
 
 void unregister_kp(struct kprobe *kp){
 

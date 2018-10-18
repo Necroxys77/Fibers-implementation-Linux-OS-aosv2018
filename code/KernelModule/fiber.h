@@ -15,6 +15,7 @@
 #include <linux/spinlock.h>
 #include <linux/bitmap.h>
 #include <linux/types.h>
+#include <linux/timekeeping32.h>
 
 #define MAX_SIZE_FLS (4096)
 #define STACK_SIZE (4096*2)
@@ -36,6 +37,7 @@ typedef struct {
     struct pt_regs *context;
     struct fpu *fpu_regs;
     int fiber_id, finalized_activations, failed_activations;
+    long exec_time, start_time;
     long long fls[MAX_SIZE_FLS];
     DECLARE_BITMAP(fls_bitmap, MAX_SIZE_FLS);
     pid_t parent_pid, running_by;
@@ -61,9 +63,10 @@ long flsAlloc(void);
 
 int flsSet(long, long long);
 
-void clean_up(void);
+fiber *get_running_fiber(int *);
 
-fiber *get_running_fiber(void);
+void remove_process(pid_t);
 
+void update_timer(struct task_struct *, struct task_struct *);
 
 #endif

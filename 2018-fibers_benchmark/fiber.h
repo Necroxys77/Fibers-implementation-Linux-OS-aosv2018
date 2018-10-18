@@ -1,6 +1,6 @@
 #pragma once
 
-#define USERSPACE
+#define KERNEL
 
 #ifdef USERSPACE
 
@@ -15,18 +15,17 @@
 #define FlsSetValue(dwFlsIndex, lpFlsData) fls_set((dwFlsIndex), (long long)(lpFlsData))
 
 #else
-
-
+#include "UserspaceLibrary/fiberlib.h"
 // TODO:
 // Here you should point to the invocation of your code!
 // See README.md for further details.
 
-#define ConvertThreadToFiber() {}
-#define CreateFiber(dwStackSize, lpStartAddress, lpParameter) {}
-#define SwitchToFiber(lpFiber) {}
-#define FlsAlloc(lpCallback) {}
-#define FlsFree(dwFlsIndex) {}
-#define FlsGetValue(dwFlsIndex) {}
-#define FlsSetValue(dwFlsIndex, lpFlsData) {}
+#define ConvertThreadToFiber() convertThreadToFiber()
+#define CreateFiber(dwStackSize, lpStartAddress, lpParameter) createFiber(dwStackSize, lpStartAddress, lpParameter)
+#define SwitchToFiber(lpFiber) switchToFiber(lpFiber)
+#define FlsAlloc(lpCallback) flsAlloc(lpCallback)
+#define FlsFree(dwFlsIndex) flsFree(dwFlsIndex)
+#define FlsGetValue(dwFlsIndex) flsGet(dwFlsIndex)
+#define FlsSetValue(dwFlsIndex, lpFlsData) flsSet((dwFlsIndex), (long long)(lpFlsData))
 
 #endif /* USERSPACE */

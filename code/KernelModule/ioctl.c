@@ -6,6 +6,7 @@ static struct class* charClass  = NULL; // The device-driver class struct pointe
 static struct device* charDevice = NULL; // The device-driver device struct pointer
 struct kprobe kp_do_exit;
 struct kretprobe kp_schedule;
+static struct jprobe jp;
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
@@ -113,14 +114,18 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             }
             
             value = (void *) flsGet(params->pos);
-            if(value!=NULL){
+            /*if(value!=0){
                 printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
                 params->value = (long long) value; success = 1;
             } else{
                 printk(KERN_INFO "[!] flsGet: failed! pos %ld\n",params->pos);
                 success = 0;
-            }
+            }*/
 
+            printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
+            params->value = (long long) value; 
+            success = 1;
+            
             kfree(params);
             return success;
 
@@ -184,12 +189,10 @@ static int __init starting(void){
     }
 
     /*Registering Kprobes*/
-    /*
     memset(&kp_do_exit, 0, sizeof(kp_do_exit));
-    if ((ret_probe = register_kp(&kp_do_exit, 'e')) < 0){
+    if ((ret_probe = register_kp(&kp_do_exit)) < 0){
         printk(KERN_ALERT "In init, failed to register probe!\n");
     }
-    */
 
     memset(&kp_schedule, 0, sizeof(kp_schedule));
     if ((ret_probe = register_kretp(&kp_schedule)) < 0){
@@ -203,7 +206,6 @@ static int __init starting(void){
 
 static void __exit exiting(void){
     printk(KERN_INFO "We are exiting..\n");
-    clean_up();
     device_destroy(charClass, MKDEV(majorNumber, 0));     // remove the device
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class

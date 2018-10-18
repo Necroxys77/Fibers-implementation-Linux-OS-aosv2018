@@ -30,19 +30,19 @@ struct ioctl_params {
     int fiber_id;
 };
 
-void *convertThreadToFiber(void);
+extern void *convertThreadToFiber(void);
 
-void *createFiber(size_t, entry_point, void *);
+extern void *createFiber(size_t stack_size, entry_point function, void *args);
 
-void switchToFiber(int);
+extern void switchToFiber(int fiber_id);
 
-long long flsGet(long);
+extern long long flsGet(long pos);
 
-bool flsFree(long);
+extern bool flsFree(long pos);
 
-long flsAlloc(void);
+extern long flsAlloc(void);
 
-void flsSet(long, long long);
+extern void flsSet(long pos, long long value);
 
 int open_device(void);
 

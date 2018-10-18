@@ -5,7 +5,8 @@ SRC = 	src/calqueue.c \
 		src/model.c \
 		src/numerical.c \
 		src/thread.c \
-		src/ult.c
+		src/ult.c \
+		UserspaceLibrary/fiberlib.c
 		
 CFLAGS = -O3
 EXEC = test
