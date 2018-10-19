@@ -36,7 +36,7 @@ int convertThreadToFiber(void){
             new_fiber->exec_time = 0;
             getnstimeofday(&current_time);
             new_fiber->start_time = current_time.tv_nsec;
-            printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
+            //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
             
@@ -69,11 +69,11 @@ int convertThreadToFiber(void){
     new_fiber->exec_time = 0;
     getnstimeofday(&current_time);
     new_fiber->start_time = current_time.tv_nsec;
-    printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
+    //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
     
-    printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
+    //printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
     return new_fiber->fiber_id;
 }
 
@@ -112,19 +112,19 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
                     /*For exec time*/
                     new_fiber->exec_time = 0;
                     new_fiber->start_time = 0;
-                    printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
+                    //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
                     hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
-                    printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
+                    //printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
 
                     return new_fiber->fiber_id;
                 }
             }
-            printk(KERN_INFO "[-] Any fibers of the caller thread found...\n");
+            //printk(KERN_INFO "[-] Any fibers of the caller thread found...\n");
             return new_fiber_id; //process found, but thread not issued convert
         }
     }
-    printk(KERN_INFO "[-] Process not found...\n"); 
+    //printk(KERN_INFO "[-] Process not found...\n"); 
     return new_fiber_id;  //process not found
 }
 
@@ -201,12 +201,12 @@ int switchToFiber(int target_fiber_id){
     //checking if the calling fiber can switch
     calling_fiber = can_switch();
     if (calling_fiber!=NULL){
-        printk(KERN_INFO "[-] Calling fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", calling_fiber->fiber_id, current->tgid, calling_fiber->parent_pid, calling_fiber->running_by);
+        //printk(KERN_INFO "[-] Calling fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", calling_fiber->fiber_id, current->tgid, calling_fiber->parent_pid, calling_fiber->running_by);
         //searching the target fiber
         target_fiber = search_target_fiber(target_fiber_id);
         if(target_fiber!=NULL){
             //preempt_disable();
-            printk(KERN_INFO "[-] Target fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", target_fiber->fiber_id, current->tgid, target_fiber->parent_pid, target_fiber->running_by);
+            //printk(KERN_INFO "[-] Target fiber [id %d, tgid %d, parent_pid %d, pid_running_thread %d] \n", target_fiber->fiber_id, current->tgid, target_fiber->parent_pid, target_fiber->running_by);
             spin_lock_irqsave(&(target_fiber->lock), flags);
             if(target_fiber->running_by == -1){
                 target_fiber->running_by = current->pid;
@@ -220,7 +220,7 @@ int switchToFiber(int target_fiber_id){
                 memset(&current_time, 0, sizeof(struct timespec));
                 getnstimeofday(&current_time);
                 calling_fiber->exec_time += (current_time.tv_nsec - calling_fiber->start_time);
-                printk(KERN_INFO "Calling id = %d, calling_fiber->exec_time = %ld, calling_fiber->start_time = %ld", calling_fiber->fiber_id, calling_fiber->exec_time, calling_fiber->start_time);
+                //printk(KERN_INFO "Calling id = %d, calling_fiber->exec_time = %ld, calling_fiber->start_time = %ld", calling_fiber->fiber_id, calling_fiber->exec_time, calling_fiber->start_time);
 
                 //copying registres from target fiber to current
                 memcpy(old_context, target_fiber->context, sizeof(struct pt_regs));
@@ -229,7 +229,7 @@ int switchToFiber(int target_fiber_id){
                 memset(&current_time, 0, sizeof(struct timespec));
                 getnstimeofday(&current_time);
                 target_fiber->start_time = current_time.tv_nsec;
-                printk(KERN_INFO "Target id = %d, target_fiber->exec_time = %ld, target_fiber->start_time = %ld", target_fiber->fiber_id, target_fiber->exec_time, target_fiber->start_time);
+                //printk(KERN_INFO "Target id = %d, target_fiber->exec_time = %ld, target_fiber->start_time = %ld", target_fiber->fiber_id, target_fiber->exec_time, target_fiber->start_time);
 
                 //For statistics
                 target_fiber->finalized_activations += 1;
@@ -238,21 +238,20 @@ int switchToFiber(int target_fiber_id){
                 calling_fiber->running_by = -1;
                 success = 1;
             } else{
-                printk(KERN_INFO "[-] Target fiber is already running by %d\n", target_fiber->running_by);
+                //printk(KERN_INFO "[-] Target fiber is already running by %d\n", target_fiber->running_by);
                 target_fiber->failed_activations += 1;
             }
             spin_unlock_irqrestore(&(target_fiber->lock), flags);
-        } else
-            printk(KERN_INFO "[-] Target fiber %d doesn't exist\n", target_fiber_id);
-    } else
-        printk(KERN_INFO "[-] Calling thread %d is not a fiber \n", current->pid);
-
+        }// else
+            //printk(KERN_INFO "[-] Target fiber %d doesn't exist\n", target_fiber_id);
+    }// else
+       //printk(KERN_INFO "[-] Calling thread %d is not a fiber \n", current->pid);
     return success;
 }
 
 
 //FLS ALLOC
-long flsAlloc(){
+long flsAlloc(void){
     process *current_process;
     fiber *current_fiber;
     long pos; //bit
@@ -264,7 +263,7 @@ long flsAlloc(){
                 if(current_fiber->running_by == current->pid){
                     pos = find_first_zero_bit(current_fiber->fls_bitmap, MAX_SIZE_FLS);
                     if (pos == MAX_SIZE_FLS){
-                        printk(KERN_ALERT "[!] fls full for fiber %d\n", current_fiber->fiber_id);
+                        //printk(KERN_ALERT "[!] fls full for fiber %d\n", current_fiber->fiber_id);
                         return -1;
                     }
                     change_bit(pos, current_fiber->fls_bitmap);
@@ -273,7 +272,7 @@ long flsAlloc(){
             }
         }
     }
-    printk(KERN_ALERT "[!] Process/fiber doesn't found in the hashtable...\n");
+    //printk(KERN_ALERT "[!] Process/fiber doesn't found in the hashtable...\n");
     return -1; //process/fiber not found
 }
 
@@ -298,6 +297,7 @@ int flsSet(long pos, long long value){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
                 if(current_fiber->running_by == current->pid && test_bit(pos, current_fiber->fls_bitmap)){
                     current_fiber->fls[pos] = value;
+                    //printk("Value %lld set at pos %ld of fiber %d\n", current_fiber->fls[pos], pos, current_fiber->fiber_id);
                     return 1;
                 }
             }
@@ -319,7 +319,7 @@ long long flsGet(long pos){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
                 //printk("testtbitttt %d\n", test_bit(pos, current_fiber->fls_bitmap));
                 if(current_fiber->running_by == current->pid && test_bit(pos, current_fiber->fls_bitmap)){
-                    printk("dfsgfhjgkhfgjfdsafghj %lld\n", current_fiber->fls[pos] );
+                    //printk("dfsgfhjgkhfgjfdsafghj %lld\n", current_fiber->fls[pos] );
                     return current_fiber->fls[pos];
                 }
                 /*}else 
@@ -359,9 +359,9 @@ void remove_process(pid_t tgid){
     
     hash_for_each_possible_rcu(processes, current_process, table_node, tgid){
         if (tgid == current_process->tgid){
-            printk(KERN_INFO "[-] Deleting process %d", current_process->tgid);
+            //printk(KERN_INFO "[-] Deleting process %d", current_process->tgid);
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                printk(KERN_INFO "[-] Deleting fiber %d", current_fiber->fiber_id);
+                //printk(KERN_INFO "[-] Deleting fiber %d", current_fiber->fiber_id);
                 kfree(current_fiber->context);
                 kfree(current_fiber->fpu_regs);
                 hash_del_rcu(&(current_fiber->table_node));
@@ -408,7 +408,7 @@ void update_timer(struct task_struct *prev, struct task_struct *next){
         if (current_process->tgid == prev->tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
                 if(current_fiber->running_by == prev->pid){
-                    printk(KERN_INFO "prev pid\n");
+                    //printk(KERN_INFO "prev pid\n");
                     memset(&current_time, 0, sizeof(struct timespec));
                     getnstimeofday(&current_time);
                     current_fiber->exec_time += (current_time.tv_nsec - current_fiber->start_time);
@@ -418,7 +418,7 @@ void update_timer(struct task_struct *prev, struct task_struct *next){
         } else if (current_process->tgid == next->tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
                 if(current_fiber->running_by == next->pid){
-                    printk(KERN_INFO "Next pid\n");
+                    //printk(KERN_INFO "Next pid\n");
                     memset(&current_time, 0, sizeof(struct timespec));
                     getnstimeofday(&current_time);
                     current_fiber->start_time = current_time.tv_nsec;

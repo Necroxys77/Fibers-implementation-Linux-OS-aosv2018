@@ -29,15 +29,16 @@ void *convertThreadToFiber(void){
         exit(0);
 
     int new_fiber_id;
-    printf("[-] Converting thread into a fiber... \n");
+    //printf("[-] Converting thread into a fiber... \n");
 
     new_fiber_id = ioctl(fd, CONVERT, NULL);
 
+    /*
     if(new_fiber_id)
         printf("[+] Thread successfully converted into fiber!\n");
     else 
         printf("[!] Thread not able to convert\n");
-
+    */
     return (void *) new_fiber_id; //to remove warnign, fiber_id should be uns long
 }
 
@@ -48,7 +49,7 @@ void *createFiber(size_t stack_size, entry_point function, void *args){
     if(!(stack_size>0))
         return 0; //error (TO CHECK)
 
-    printf("[-] Creating a fiber... \n");
+    //printf("[-] Creating a fiber... \n");
     posix_memalign(&sp, 16, stack_size);
     bzero(sp, stack_size);
 
@@ -60,26 +61,29 @@ void *createFiber(size_t stack_size, entry_point function, void *args){
 
     new_fiber_id = ioctl(fd, CREATE, &params);
 
+    /*
     if(new_fiber_id)
         printf("[+] Fiber %d created!\n", new_fiber_id);
     else
         printf("[!] Impossible to create a fiber!\n");
-
+    */
     return (void *) new_fiber_id;
 }
 
 void switchToFiber(int fiber_id){
     int success;
     if(fiber_id>0){
-        printf("[-] Switching to fiber %d...\n", fiber_id);
+        //printf("[-] Switching to fiber %d...\n", fiber_id);
 
         struct ioctl_params params = {
             .fiber_id = fiber_id
         };
 
         success = ioctl(fd, SWITCH, &params);
+        /*
         if(!success)
             printf("[!] Impossible to switch into fiber %d\n", fiber_id);
+        */
     }
 }
 
@@ -87,10 +91,12 @@ long flsAlloc(){
     long pos;
     
     pos = ioctl(fd, FLSALLOC, NULL);
+    /*
     if(pos != -1)
         printf("[+] Retrieved position %ld from the fls\n", pos);
     else
         printf("[!] Failed to retrieve a position in the fls...");
+    */
     return pos;
 }
 
@@ -99,37 +105,38 @@ void flsSet(long pos, long long value){
 
     if(pos < 0)
         printf("[!] flsSet pos is negative\n");
-    else {
-
+    else{
         struct ioctl_params params = {
             .pos = pos,
             .value = value
         };
 
         success = ioctl(fd, FLSSET, &params);
+        /*
         if(success)
             printf("[+] Value %lld is put at position %ld\n", value, pos);
         else
             printf("[!] Error while setting the value\n");
+        */
     }
 }
 
 long long flsGet(long pos){
-    void *value;
 
     if(pos < 0)
         printf("[!] flsGet pos is negative\n");
     else {
 
         struct ioctl_params params = {
-            .pos = pos
+            .pos = pos,
+            .value = -1
         };
 
         if (ioctl(fd, FLSGET, &params)){
-            printf("[+] Value %lld is retrieved from position %ld\n", (long long) value, pos);
+            //printf("[+] Value %lld is retrieved from position %ld\n", params.value, pos);
             return params.value;
         }
-        printf("[!] Error while retrieving the value\n");
+        //printf("[!] Error while retrieving the value\n");
         return (long long) NULL;
 
         /*value = (void *) ioctl(fd, FLSGET, &params);
@@ -155,10 +162,10 @@ bool flsFree(long pos){
         };
 
         if(ioctl(fd, FLSFREE, &params)){
-            printf("[+] Position %ld freed from fls!\n", pos);
+            //printf("[+] Position %ld freed from fls!\n", pos);
             success = true;
-        } else
-            printf("[!] Error while freeing the value in position %ld\n", pos);
+        }// else
+           // printf("[!] Error while freeing the value in position %ld\n", pos);
     }
 
     return success;

@@ -29,19 +29,20 @@ static char *unlock_sudo(struct device *dev, umode_t *mode){
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
     int fiber_id, success;
     long pos;
-    void *value;
+    long long value;
     struct ioctl_params *params;
 
     switch(cmd){
         case CONVERT:
-            printk(KERN_INFO "[-] Converting thread into a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
+            //printk(KERN_INFO "[-] Converting thread into a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
             fiber_id = convertThreadToFiber();
 
+            /*
             if(fiber_id)
                 printk(KERN_INFO "[+] convertThreadToFiber: succeded!\n");
             else
                 printk(KERN_ALERT "[!] Thread has already issued convertThreadToFiber! [tgid %d, pid %d]\n", current->tgid, current->pid);
-            
+            */
             return fiber_id;
         
         case CREATE:
@@ -51,14 +52,15 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
                 return 0; //error copy failed
             }
 
-            printk(KERN_INFO "[-] Creating a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
+            //printk(KERN_INFO "[-] Creating a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
             fiber_id = createFiber(params->sp, params->user_func, params->args);
 
+            /*
             if(fiber_id)
                 printk(KERN_INFO "[+] createFiber: succeded!\n");
             else
                 printk(KERN_ALERT "[!] Thread not authorized to create fibers! convertThreadToFiber not issued yet!\n");
-
+            */
             kfree(params);
             return fiber_id;
 
@@ -69,25 +71,25 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
                 return 0; //error copy failed
             }
 
-            printk(KERN_INFO "[-] Switching to Fiber %d ...\n", params->fiber_id);
+            //printk(KERN_INFO "[-] Switching to Fiber %d ...\n", params->fiber_id);
             success = switchToFiber(params->fiber_id);
-
+            /*
             if(success)
                 printk(KERN_INFO "[+] switchToFiber: succeded!\n");
             else
                 printk(KERN_ALERT "[!] Impossible to switch to fiber %d!\n", params->fiber_id);
-            
+            */
             kfree(params);
             return success;
 
         case FLSALLOC:
             pos = flsAlloc();
-
+            /*
             if(pos!=-1)
                 printk(KERN_INFO "[+] flsAlloc: succeded! pos %ld\n",pos);
             else
                 printk(KERN_ALERT "[!] No more space in fiber fls...\n");
-
+            */
             return pos;
 
         case FLSSET:
@@ -98,11 +100,12 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             }
 
             success = flsSet(params->pos, params->value);
+            /*
             if(success)
-                 printk(KERN_INFO "[+] flsSet: succeded! value %lld to pos %ld\n", params->value, params->pos);
+                printk(KERN_INFO "[+] flsSet: succeded! value %lld to pos %ld\n", params->value, params->pos);
             else
                 printk(KERN_INFO "[!] flsSet: failed! value %lld to pos %ld\n", params->value, params->pos);
-
+            */
             kfree(params);
             return success;
 
@@ -113,7 +116,7 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
                 return 0; //error copy failed
             }
             
-            value = (void *) flsGet(params->pos);
+            value = flsGet(params->pos);
             /*if(value!=0){
                 printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
                 params->value = (long long) value; success = 1;
@@ -122,8 +125,13 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
                 success = 0;
             }*/
 
-            printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
-            params->value = (long long) value; 
+            //printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
+            params->value = value; 
+
+            if (copy_to_user((void *) arg, params, sizeof(struct ioctl_params)) != 0){
+                kfree(params);
+                return 0; //error copy failed
+            }
             success = 1;
             
             kfree(params);
@@ -138,11 +146,12 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             }
 
             success = flsFree(params->pos);
+            /*
             if(success)
                  printk(KERN_INFO "[+] flsFree: succeded! pos %ld\n", params->pos);
             else
                 printk(KERN_INFO "[!] flsFree: failed! pos %ld\n", params->pos);
-
+            */
             kfree(params);
             return success;
     }
