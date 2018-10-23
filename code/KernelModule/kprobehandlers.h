@@ -1,7 +1,6 @@
 #include <linux/kprobes.h> 
 #include "fiber.h"
-//#include <linux/proc_fs.h>
-//#include <linux/proc_ns.h>
+#include <linux/proc_fs.h>
 
 union proc_op {
 	int (*proc_get_link)(struct dentry *, struct path *);
@@ -10,18 +9,21 @@ union proc_op {
 		struct task_struct *task);
 };
 
-struct proc_inode {
-	struct pid *pid;
-	unsigned int fd;
+struct pid_entry {
+	const char *name;
+	unsigned int len;
+	umode_t mode;
+	const struct inode_operations *iop;
+	const struct file_operations *fop;
 	union proc_op op;
-	struct proc_dir_entry *pde;
-	struct ctl_table_header *sysctl;
-	struct ctl_table *sysctl_entry;
-	const struct proc_ns_operations *ns_ops;
-	struct inode vfs_inode;
 };
 
-
+struct kretprobe_data {
+	struct file *file;
+    struct dir_context *ctx;
+    const struct pid_entry *ents;
+    unsigned int nents;
+};
 
 //int pre_do_exit(struct kprobe *, struct pt_regs *);
 
@@ -38,6 +40,8 @@ int register_kp(struct kprobe *);
 void unregister_kp(struct kprobe *);
 
 int register_kretp(struct kretprobe *);
+
+int register_kretp_proc_readdir(struct kretprobe *);
 
 void unregister_kretp(struct kretprobe *);
 

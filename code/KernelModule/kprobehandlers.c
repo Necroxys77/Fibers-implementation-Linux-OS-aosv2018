@@ -2,6 +2,12 @@
 
 DEFINE_PER_CPU(struct task_struct *, prev) = NULL;
 
+typedef int (*func)(struct file *file, struct dir_context *ctx, 
+                const struct pid_entry *ents, unsigned int nents)/* = 
+                (int (*))(struct file *file, struct dir_context *ctx, 
+                            const struct pid_entry *ents, unsigned int nents) kallsyms_lookup_name("proc_pident_readdir")*/;
+/*int x = func();*/
+
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
@@ -46,6 +52,59 @@ int post_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
     return 0;
 }
 
+int pre_proc_readdir(struct kretprobe_instance *ri, struct pt_regs *regs){
+
+    struct kretprobe_data *proc_data;
+    //proc_data = (struct kretprobe_data *) kmalloc(sizeof(struct kretprobe_data *), GFP_KERNEL);
+
+    struct file *file = (struct file *) regs->di;
+    struct dir_context *ctx = (struct dir_context *) regs->si;
+    const struct pid_entry *ents = (struct pid_entry *) regs->dx;
+    unsigned int nents = (unsigned int) regs->cx;
+
+    proc_data = (struct kretprobe_data *) ri->data;
+
+    proc_data->file = file;
+    proc_data->ctx = ctx;
+    proc_data->ents = ents;
+    proc_data->nents = nents;
+
+    //struct file *f = (struct file *)regs->di;
+    printk("name file: %s, size ents: %ld, nents: %u", file->f_path.dentry->d_name.name, sizeof(ents), nents);
+    return 0;
+}
+
+/*rdi, rsi, rdx, r10 (rcx)*/
+int post_proc_readdir(struct kretprobe_instance *ri, struct pt_regs *regs){
+    struct kretprobe_data *proc_data;
+    struct file *file;
+    struct dir_context *ctx;
+    const struct pid_entry *ents;
+    struct pid_entry fiber_dir, *my_tgid;
+    unsigned int nents;
+    int ret;
+    func ciao = (func) kallsyms_lookup_name("proc_pident_readdir");
+
+    proc_data = (struct kretprobe_data *) ri->data;
+    file = proc_data->file;
+    ctx = proc_data->ctx;
+    ents = proc_data->ents;
+    nents = proc_data->nents;
+
+    my_tgid = (struct pid_entry *) kmalloc(sizeof(struct pid_entry) * (nents + 1), GFP_KERNEL);
+    fiber_dir.name = "fiber";
+    fiber_dir.len = sizeof("fiber");
+    fiber_dir.mode = S_IFDIR | S_IRUGO | S_IXUGO;
+    fiber_dir.iop = NULL;
+    fiber_dir.fop = NULL;
+
+    memcpy(my_tgid, ents, nents);
+    my_tgid[nents] = fiber_dir;
+    ret = ciao(file, ctx, my_tgid, nents+1); //Retrieve return value of ciao and return it
+    kfree(my_tgid);
+    return ret;
+}
+
 int register_kp(struct kprobe *kp){
     
     kp->addr = (kprobe_opcode_t *) do_exit; 
@@ -63,8 +122,21 @@ int register_kp(struct kprobe *kp){
 
 /* kallsyms_lookup_name("proc_pident_lookup") */
 
-int register_kretp(struct kretprobe *kretp){
+int register_kretp_proc_readdir(struct kretprobe *kretp){
+    kretp->handler = post_proc_readdir;
+    kretp->entry_handler = pre_proc_readdir;
+    kretp->kp.addr = (kprobe_opcode_t *) kallsyms_lookup_name("proc_pident_readdir");
 
+    if (!register_kretprobe(kretp)) {
+        printk(KERN_INFO "[+] Kretprobe proc_tgid_base_readdir() registered!\n");
+		return 1;
+	} else {
+        printk(KERN_ALERT "[!] Registering Kretprobe proc_tgid_base_readdir() has failed!\n");
+		return -2;
+	}
+}
+
+int register_kretp(struct kretprobe *kretp){
     kretp->handler = post_schedule;
     kretp->kp.symbol_name = "finish_task_switch";
 
@@ -75,20 +147,6 @@ int register_kretp(struct kretprobe *kretp){
         printk(KERN_ALERT "[!] Registering Kretprobe has failed!\n");
 		return -2;
 	}
-}
-
-static int my_func(struct file *file, struct dir_context *ctx, const struct pid_entry *ents, unsigned int nents){
-
-    //struct pid_entry *x;
-    //x = (struct pid_entry *) kmalloc(sizeof(struct pide_entry *), GFP_KERNEL);
-    //memcpy(x, ents, sizeof(ents));
-    struct proc_inode *x = container_of(file->f_inode, struct proc_inode, vfs_inode);
-    struct task_struct *task = get_pid_task(x->pid,  PIDTYPE_PID);
-    //struct task_struct *task = get_proc_task(file_inode(file));
-    //struct inode *i = file->f_inode;
-    printk("Caiooo %d\n", task->pid);
-    //printk("%s\n", x->name);
-    return 1;
 }
 
 void unregister_kp(struct kprobe *kp){
