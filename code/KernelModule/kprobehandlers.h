@@ -21,9 +21,34 @@ struct pid_entry {
 struct kretprobe_data {
 	struct file *file;
     struct dir_context *ctx;
-    const struct pid_entry *ents;
-    unsigned int nents;
+    unsigned int flags;
+	struct inode *dir;
+	struct dentry* dentry;
 };
+
+struct proc_inode {
+	struct pid *pid;
+	unsigned int fd;
+	union proc_op op;
+	struct proc_dir_entry *pde;
+	struct ctl_table_header *sysctl;
+	struct ctl_table *sysctl_entry;
+	struct hlist_node sysctl_inodes;
+	const struct proc_ns_operations *ns_ops;
+	struct inode vfs_inode;
+} __randomize_layout;
+
+static inline struct proc_inode *PROC_I(const struct inode *inode) {
+	return container_of(inode, struct proc_inode, vfs_inode);
+}
+
+static inline struct pid *proc_pid(struct inode *inode) {
+	return PROC_I(inode)->pid;
+}
+
+static inline struct task_struct *get_proc_task(struct inode *inode) {
+	return get_pid_task(proc_pid(inode), PIDTYPE_PID);
+}
 
 //int pre_do_exit(struct kprobe *, struct pt_regs *);
 
@@ -42,6 +67,8 @@ void unregister_kp(struct kprobe *);
 int register_kretp(struct kretprobe *);
 
 int register_kretp_proc_readdir(struct kretprobe *);
+
+int register_kretp_proc_lookup(struct kretprobe *);
 
 void unregister_kretp(struct kretprobe *);
 

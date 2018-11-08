@@ -428,3 +428,15 @@ void update_timer(struct task_struct *prev, struct task_struct *next){
         }
     }
 }
+
+process *get_process_by_tgid(pid_t tgid){
+
+    process *current_process;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, tgid){
+        if(current_process->tgid == tgid){
+            return current_process;
+        }
+    }
+    return NULL;
+}

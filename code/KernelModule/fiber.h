@@ -69,4 +69,6 @@ void remove_process(pid_t);
 
 void update_timer(struct task_struct *, struct task_struct *);
 
+process *get_process_by_tgid(pid_t);
+
 #endif

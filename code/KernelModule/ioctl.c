@@ -5,7 +5,7 @@ static int majorNumber;
 static struct class* charClass  = NULL; // The device-driver class struct pointer
 static struct device* charDevice = NULL; // The device-driver device struct pointer
 struct kprobe kp_do_exit;
-struct kretprobe kp_schedule, kp_proc;
+struct kretprobe kp_schedule, kp_proc, kp_proc_lookup;
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
@@ -35,7 +35,7 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
         case CONVERT:
             //printk(KERN_INFO "[-] Converting thread into a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
             fiber_id = convertThreadToFiber();
-
+            printk("%d\n", current->pid);
             /*
             if(fiber_id)
                 printk(KERN_INFO "[+] convertThreadToFiber: succeded!\n");
@@ -212,6 +212,10 @@ static int __init starting(void){
         printk(KERN_ALERT "In init, failed to register kretprobe!\n");
     }
 
+    memset(&kp_proc_lookup, 0, sizeof(kp_proc_lookup));
+    if ((ret_probe = register_kretp_proc_lookup(&kp_proc_lookup)) < 0){
+        printk(KERN_ALERT "In init, failed to register kretprobe!\n");
+    }
 
     printk(KERN_INFO "Device class created correctly, __init finished!\n"); // Made it! device was initialized
     return 0;
@@ -227,6 +231,7 @@ static void __exit exiting(void){
     unregister_kp(&kp_do_exit);
     unregister_kretp(&kp_schedule);
     unregister_kretp(&kp_proc);
+    unregister_kretp(&kp_proc_lookup);
     printk(KERN_INFO "Goodbye from the LKM!\n");
 }
 
