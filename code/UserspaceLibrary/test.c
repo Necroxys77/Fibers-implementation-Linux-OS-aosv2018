@@ -1,4 +1,4 @@
-#include "fiberlib.h"
+#include "fiberlib.c"
 
 //test
 struct stru {

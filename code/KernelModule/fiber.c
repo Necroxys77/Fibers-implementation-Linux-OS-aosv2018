@@ -42,6 +42,8 @@ int convertThreadToFiber(void){
 
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
             
+
+            printk(KERN_INFO "%d\n", new_fiber->fiber_id);
             return new_fiber->fiber_id;
         }
     }
@@ -78,6 +80,8 @@ int convertThreadToFiber(void){
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
     
     //printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
+
+    printk(KERN_INFO "%d\n", new_fiber->fiber_id);
     return new_fiber->fiber_id;
 }
 
@@ -123,6 +127,8 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
                     hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
                     //printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
 
+
+                    printk(KERN_INFO "%d\n", new_fiber->fiber_id);
                     return new_fiber->fiber_id;
                 }
             }

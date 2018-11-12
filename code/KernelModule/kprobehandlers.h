@@ -52,6 +52,7 @@ static inline struct task_struct *get_proc_task(struct inode *inode) {
 	return get_pid_task(proc_pid(inode), PIDTYPE_PID);
 }
 
+
 //int pre_do_exit(struct kprobe *, struct pt_regs *);
 
 int pre_schedule(struct kretprobe_instance *, struct pt_regs *);
@@ -77,3 +78,4 @@ void unregister_kretp(struct kretprobe *);
 int register_jp(struct jprobe *);
 
 void unregister_jp(struct jprobe *);
+

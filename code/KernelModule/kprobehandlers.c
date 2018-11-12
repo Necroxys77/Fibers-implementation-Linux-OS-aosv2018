@@ -13,6 +13,26 @@ typedef struct dentry *(*proc_pident_lookup_t) (struct inode *dir, struct dentry
 typedef int (*pid_getattr_t) (const struct path *, struct kstat *, u32, unsigned int);
 typedef int (*proc_setattr_t) (struct dentry *dentry, struct iattr *attr);
 
+int fiber_readdir(struct file *, struct dir_context *);
+
+struct dentry *fiber_lookup(struct inode *dir, struct dentry *, unsigned int);
+
+ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *ppos);
+
+struct file_operations file_ops = {
+				.read  = generic_read_dir,
+    			.iterate_shared = fiber_readdir,
+				.llseek  = generic_file_llseek,
+};
+
+struct inode_operations inode_ops = {
+				.lookup = fiber_lookup,
+};
+
+struct file_operations fiber_ops = {
+        read: fiber_read,
+};
+
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
@@ -110,7 +130,7 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     size_t written_bytes, offset;
 
     if ((task_pid = get_proc_task(file->f_inode)) == NULL){
-        printk("fiber_lookup no\n");
+        //printk("fiber_lookup no\n");
         return 0;//real_lookup(dir, dentry, NULL, 0);
     }
 
@@ -118,8 +138,8 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     if ((fib = get_fiber_by_id(task_pid->tgid, fiber_id)) == NULL)
         return 0;
     
-    snprintf(fiber_stats, STATS_SIZE, "Running: %d\n Initial entry point: 0x%016lx\n Parent thread id: %d\n Number of activations: %d\n Number of failed activations: %d\n Total execution time: %lu s\n", 
-                                        ((fib->running_by == -1) ? 0 : 1), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time/1000000000);
+    snprintf(fiber_stats, STATS_SIZE, "Running: %d\nInitial entry point: 0x%016lx\nParent thread id: %d\nNumber of activations: %d\nNumber of failed activations: %d\nTotal execution time: %lu s\n", 
+                                        ((fib->running_by == -1) ? 0 : 1), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, (fib->exec_time/1000000));
 
     written_bytes = strnlen(fiber_stats, STATS_SIZE);
     if (*ppos >= written_bytes)
@@ -142,29 +162,25 @@ struct dentry *fiber_lookup(struct inode *dir, struct dentry *dentry, unsigned i
     int f_index;
     struct dentry *ret;
     proc_pident_lookup_t real_lookup = (proc_pident_lookup_t) kallsyms_lookup_name("proc_pident_lookup");
-    printk("fiber_lookup\n");
+    //printk("fiber_lookup\n");
     
     if ((task_pid = get_proc_task(dir)) == NULL || dir == NULL || dentry == NULL)
         return ERR_PTR(-ENOENT);
 
     if ((current_process = get_process_by_tgid(task_pid->tgid)) == NULL){
-        printk("fiber_lookup no\n");
+        //printk("fiber_lookup no\n");
         return 0;//real_lookup(dir, dentry, NULL, 0);
     }
-
-    struct file_operations fiber_ops = {
-        read: fiber_read,
-    };
-
+    
     nents_fiber_readdir = (unsigned int) atomic_read(&(current_process->total_fibers));
     ents = (struct pid_entry *) kmalloc(nents_fiber_readdir * sizeof(struct pid_entry), GFP_KERNEL);
     memset(ents, 0, nents_fiber_readdir * sizeof(struct pid_entry));
-    printk("fiber_lookup\n");
+    //printk("fiber_lookup\n");
     hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
         if (current_fiber == NULL)
             break;
         //memset(name, 0, 8);
-        printk("cycle_lookup\n");
+        //printk("cycle_lookup\n");
         //ents[current_fiber->fiber_id].len = sprintf(name, "%d", current_fiber->fiber_id);
         ents[current_fiber->fiber_id - 1].name = current_fiber->fiber_id_string;
         ents[current_fiber->fiber_id - 1].len = strlen(current_fiber->fiber_id_string);
@@ -187,19 +203,16 @@ int fiber_readdir(struct file *file, struct dir_context *ctx){
     fiber *current_fiber;
     int f_index, ret;
 
-    struct file_operations fiber_ops = {
-        read: fiber_read,
-    };
 
     proc_pident_readdir_t real_readdir = (proc_pident_readdir_t) kallsyms_lookup_name("proc_pident_readdir");
 
-    printk("fiber_readdir sopra\n");
+    //printk("fiber_readdir sopra\n");
 
     if ((task_pid = get_proc_task(file_inode(file))) == NULL || file == NULL || ctx == NULL)
         return -ENOENT;
 
     if ((current_process = get_process_by_tgid(task_pid->tgid)) == NULL){
-        printk("fiber_readdir no\n");
+        //printk("fiber_readdir no\n");
         return 0;//real_readdir(file, ctx, NULL, 0);
     }
 
@@ -211,7 +224,7 @@ int fiber_readdir(struct file *file, struct dir_context *ctx){
         if (current_fiber == NULL)
             break;
         //memset(name, 0, 8);
-        printk("cycle_lookup\n");
+        //printk("cycle_lookup\n");
         //ents[current_fiber->fiber_id].len = sprintf(name, "%d", current_fiber->fiber_id);
         ents[current_fiber->fiber_id - 1].name = current_fiber->fiber_id_string;
         ents[current_fiber->fiber_id - 1].len = strlen(current_fiber->fiber_id_string);
@@ -234,10 +247,10 @@ int post_proc_readdir(struct kretprobe_instance *ri, struct pt_regs *regs){
     struct pid_entry *fiber_dir;
     unsigned int nents_readdir;
     struct task_struct *task_pid;
-    struct inode_operations inode_ops;
-    struct file_operations file_ops;
+   // struct inode_operations inode_ops;
+    //struct file_operations file_ops;
     unsigned long flags;
-
+/*
     inode_ops.lookup = fiber_lookup;
     inode_ops.getattr = (pid_getattr_t) kallsyms_lookup_name("pid_getattr");
 	inode_ops.setattr = (proc_setattr_t) kallsyms_lookup_name("proc_setattr");
@@ -245,7 +258,7 @@ int post_proc_readdir(struct kretprobe_instance *ri, struct pt_regs *regs){
     file_ops.iterate_shared = fiber_readdir;
     file_ops.read = generic_read_dir;
     file_ops.llseek = generic_file_llseek;
-
+*/
     proc_data = (struct kretprobe_data *) ri->data;
     file = proc_data->file;
     /*ents = proc_data->ents;
@@ -259,13 +272,13 @@ int post_proc_readdir(struct kretprobe_instance *ri, struct pt_regs *regs){
     }
 
     if ((task_pid = get_proc_task(file_inode(file))) == NULL){
-        printk("NOOOOO readdir\n");
+        //printk("NOOOOO readdir\n");
         return 0;//-ENOENT;
     }
     proc_pident_readdir_t real_readdir = (proc_pident_readdir_t) kallsyms_lookup_name("proc_pident_readdir");
 
     if (get_process_by_tgid(task_pid->tgid) == NULL){
-        printk("NOOOOO readdir 2\n");
+        //printk("NOOOOO readdir 2\n");
         return 0;//real_readdir(file, ctx, ents, nents); //Retrieve return value of ciao and return it
     }
 
@@ -292,9 +305,9 @@ int post_proc_lookup(struct kretprobe_instance *ri, struct pt_regs *regs){
     unsigned int nents_lookup;
     unsigned long flags;
     struct task_struct *task_pid;
-    struct inode_operations inode_ops;
-    struct file_operations file_ops;
-
+    //struct inode_operations inode_ops;
+    //struct file_operations file_ops;
+/*
     inode_ops.lookup = fiber_lookup;
     inode_ops.getattr = (pid_getattr_t) kallsyms_lookup_name("pid_getattr");//kallsyms_lookup_name("pid_getattr");
 	inode_ops.setattr = (proc_setattr_t) kallsyms_lookup_name("proc_setattr");
@@ -302,7 +315,7 @@ int post_proc_lookup(struct kretprobe_instance *ri, struct pt_regs *regs){
     file_ops.iterate_shared = fiber_readdir;
     file_ops.read = generic_read_dir;
     file_ops.llseek = generic_file_llseek;
-
+*/
     proc_data = (struct kretprobe_data *) ri->data;
     dir = proc_data->dir;
     dentry = proc_data->dentry;
@@ -312,13 +325,13 @@ int post_proc_lookup(struct kretprobe_instance *ri, struct pt_regs *regs){
         return 0;
 
     if ((task_pid = get_proc_task(dir)) == NULL){
-        printk("NOOOOO\n");
+        //printk("NOOOOO\n");
         return 0;//-ENOENT;
     } 
     proc_pident_lookup_t real_lookup = (proc_pident_lookup_t) kallsyms_lookup_name("proc_pident_lookup");
 
     if (get_process_by_tgid(task_pid->tgid) == NULL){
-        printk("NOOOOO2\n");
+        //printk("NOOOOO2\n");
         //real_lookup(dir, dentry, ents, nents); //Retrieve return value of ciao and return it
         return 0;
     }
@@ -367,6 +380,9 @@ int register_kretp_proc_lookup(struct kretprobe *kretp){
         printk(KERN_ALERT "[!] Registering Kretprobe proc_tgid_base_lookup() has failed!\n");
 		return -2;
 	}
+    inode_ops.getattr = (pid_getattr_t) kallsyms_lookup_name("pid_getattr");
+	inode_ops.setattr = (proc_setattr_t) kallsyms_lookup_name("proc_setattr");
+
 }
 
 int register_kretp_proc_readdir(struct kretprobe *kretp){
@@ -383,6 +399,9 @@ int register_kretp_proc_readdir(struct kretprobe *kretp){
         printk(KERN_ALERT "[!] Registering Kretprobe proc_tgid_base_readdir() has failed!\n");
 		return -2;
 	}
+    inode_ops.getattr = (pid_getattr_t) kallsyms_lookup_name("pid_getattr");
+	inode_ops.setattr = (proc_setattr_t) kallsyms_lookup_name("proc_setattr");
+
 }
 
 int register_kretp(struct kretprobe *kretp){
