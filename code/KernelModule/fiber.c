@@ -27,10 +27,12 @@ int convertThreadToFiber(void){
             memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
             copy_fxregs_to_kernel(new_fiber->fpu_regs);
             new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+            snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
             new_fiber->running_by = current->pid;
             new_fiber->parent_pid = current->pid;
             new_fiber->finalized_activations = 1;
             new_fiber->failed_activations = 0;
+            new_fiber->initial_entry_point = (void *) task_pt_regs(current)->ip;
             /*For exec time*/
             memset(&current_time, 0, sizeof(struct timespec));
             new_fiber->exec_time = 0;
@@ -60,10 +62,12 @@ int convertThreadToFiber(void){
     memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
     copy_fxregs_to_kernel(new_fiber->fpu_regs);
     new_fiber->fiber_id = atomic_inc_return(&(new_process->total_fibers));
+    snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
     new_fiber->running_by = current->pid;
     new_fiber->parent_pid = current->pid;
     new_fiber->finalized_activations = 1;
     new_fiber->failed_activations = 0;
+    new_fiber->initial_entry_point = (void *) task_pt_regs(current)->ip;
     /*For exec time*/
     memset(&current_time, 0, sizeof(struct timespec));
     new_fiber->exec_time = 0;
@@ -104,10 +108,12 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
                     new_fiber->context->ip = (unsigned long) user_function;
                     new_fiber->context->di = (unsigned long) args;
                     new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+                    snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
                     new_fiber->running_by = -1; //pid_t can be -1?
                     new_fiber->parent_pid = current->pid;
                     new_fiber->finalized_activations = 0;
                     new_fiber->failed_activations = 0;
+                    new_fiber->initial_entry_point = (void *) user_function;
 
                     /*For exec time*/
                     new_fiber->exec_time = 0;
@@ -439,4 +445,22 @@ process *get_process_by_tgid(pid_t tgid){
         }
     }
     return NULL;
+}
+
+fiber *get_fiber_by_id(pid_t tgid, int fiber_id){
+
+    process *current_process;
+    int f_index;
+    fiber *current_fiber;
+
+    hash_for_each_possible_rcu(processes, current_process, table_node, tgid){
+        if(current_process->tgid == tgid){
+            hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
+                if (current_fiber->fiber_id == fiber_id)
+                    return current_fiber;
+            }
+        }
+    }
+    return NULL;
+
 }

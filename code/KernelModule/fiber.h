@@ -17,8 +17,9 @@
 #include <linux/types.h>
 #include <linux/timekeeping32.h>
 
-#define MAX_SIZE_FLS (4096)
+#define MAX_SIZE_FLS 4096
 #define STACK_SIZE (4096*2)
+#define FIBER_NAME 512
 
 
 typedef void (*entry_point)(void *param);
@@ -42,6 +43,8 @@ typedef struct {
     DECLARE_BITMAP(fls_bitmap, MAX_SIZE_FLS);
     pid_t parent_pid, running_by;
     struct hlist_node table_node;
+    char fiber_id_string[FIBER_NAME];
+    void *initial_entry_point;
 } fiber;
 
 
@@ -70,5 +73,7 @@ void remove_process(pid_t);
 void update_timer(struct task_struct *, struct task_struct *);
 
 process *get_process_by_tgid(pid_t);
+
+fiber *get_fiber_by_id(pid_t, int);
 
 #endif

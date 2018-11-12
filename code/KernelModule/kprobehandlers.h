@@ -2,6 +2,8 @@
 #include "fiber.h"
 #include <linux/proc_fs.h>
 
+#define STATS_SIZE 1024
+
 union proc_op {
 	int (*proc_get_link)(struct dentry *, struct path *);
 	int (*proc_show)(struct seq_file *m,
@@ -36,7 +38,7 @@ struct proc_inode {
 	struct hlist_node sysctl_inodes;
 	const struct proc_ns_operations *ns_ops;
 	struct inode vfs_inode;
-} __randomize_layout;
+};//__randomize_layout
 
 static inline struct proc_inode *PROC_I(const struct inode *inode) {
 	return container_of(inode, struct proc_inode, vfs_inode);
