@@ -38,7 +38,7 @@ typedef struct {
     struct pt_regs *context;
     struct fpu *fpu_regs;
     int fiber_id, finalized_activations, failed_activations;
-    long exec_time, start_time;
+    unsigned long exec_time, start_time;
     long long fls[MAX_SIZE_FLS];
     DECLARE_BITMAP(fls_bitmap, MAX_SIZE_FLS);
     pid_t parent_pid, running_by;

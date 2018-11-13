@@ -48,7 +48,7 @@ void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
         current_fiber->running_by = -1;
         memset(&current_time, 0, sizeof(struct timespec));
         getnstimeofday(&current_time);
-        current_fiber->exec_time += (current_time.tv_nsec - current_fiber->start_time);
+        current_fiber->exec_time += ((current_time.tv_nsec + current_time.tv_sec*1000000000) - current_fiber->start_time)/1000000;
     }
 
     //printk("PostHandler do_exit: eseguito %d\n", current->pid);
@@ -135,11 +135,14 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     }
 
     kstrtoul(file->f_path.dentry->d_name.name, 10, &fiber_id);
+    printk("%lu\n", fiber_id);
     if ((fib = get_fiber_by_id(task_pid->tgid, fiber_id)) == NULL)
         return 0;
     
-    snprintf(fiber_stats, STATS_SIZE, "Running: %d\nInitial entry point: 0x%016lx\nParent thread id: %d\nNumber of activations: %d\nNumber of failed activations: %d\nTotal execution time: %lu s\n", 
-                                        ((fib->running_by == -1) ? 0 : 1), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, (fib->exec_time/1000000));
+    printk("%d\n", fib->running_by);
+
+    snprintf(fiber_stats, STATS_SIZE, "Running: %s\nInitial entry point: 0x%016lx\nParent thread id: %d\nNumber of activations: %d\nNumber of failed activations: %d\nTotal execution time: %lu ms\n", 
+                                        ((fib->running_by == -1) ? "no" : "yes"), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time);
 
     written_bytes = strnlen(fiber_stats, STATS_SIZE);
     if (*ppos >= written_bytes)

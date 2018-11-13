@@ -37,13 +37,12 @@ int convertThreadToFiber(void){
             memset(&current_time, 0, sizeof(struct timespec));
             new_fiber->exec_time = 0;
             getnstimeofday(&current_time);
-            new_fiber->start_time = current_time.tv_nsec;
+            new_fiber->start_time = current_time.tv_nsec + current_time.tv_sec*1000000000;
             //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
-            
 
-            printk(KERN_INFO "%d\n", new_fiber->fiber_id);
+            printk("%d\n", new_fiber->running_by);
             return new_fiber->fiber_id;
         }
     }
@@ -74,14 +73,12 @@ int convertThreadToFiber(void){
     memset(&current_time, 0, sizeof(struct timespec));
     new_fiber->exec_time = 0;
     getnstimeofday(&current_time);
-    new_fiber->start_time = current_time.tv_nsec;
+    new_fiber->start_time = current_time.tv_nsec + current_time.tv_sec*1000000000;
     //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
-    
+    printk("%d\n", new_fiber->running_by);
     //printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
-
-    printk(KERN_INFO "%d\n", new_fiber->fiber_id);
     return new_fiber->fiber_id;
 }
 
@@ -127,8 +124,6 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
                     hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
                     //printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
 
-
-                    printk(KERN_INFO "%d\n", new_fiber->fiber_id);
                     return new_fiber->fiber_id;
                 }
             }
@@ -231,7 +226,8 @@ int switchToFiber(int target_fiber_id){
                 /*For exec time*/
                 memset(&current_time, 0, sizeof(struct timespec));
                 getnstimeofday(&current_time);
-                calling_fiber->exec_time += (current_time.tv_nsec - calling_fiber->start_time);
+                calling_fiber->exec_time += ((current_time.tv_nsec + current_time.tv_sec*1000000000) - calling_fiber->start_time)/1000000;
+
                 //printk(KERN_INFO "Calling id = %d, calling_fiber->exec_time = %ld, calling_fiber->start_time = %ld", calling_fiber->fiber_id, calling_fiber->exec_time, calling_fiber->start_time);
 
                 //copying registres from target fiber to current
@@ -240,7 +236,7 @@ int switchToFiber(int target_fiber_id){
 
                 memset(&current_time, 0, sizeof(struct timespec));
                 getnstimeofday(&current_time);
-                target_fiber->start_time = current_time.tv_nsec;
+                target_fiber->start_time = (current_time.tv_nsec + current_time.tv_sec*1000000000);
                 //printk(KERN_INFO "Target id = %d, target_fiber->exec_time = %ld, target_fiber->start_time = %ld", target_fiber->fiber_id, target_fiber->exec_time, target_fiber->start_time);
 
                 //For statistics
@@ -423,7 +419,7 @@ void update_timer(struct task_struct *prev, struct task_struct *next){
                     //printk(KERN_INFO "prev pid\n");
                     memset(&current_time, 0, sizeof(struct timespec));
                     getnstimeofday(&current_time);
-                    current_fiber->exec_time += (current_time.tv_nsec - current_fiber->start_time);
+                    current_fiber->exec_time += ((current_time.tv_nsec + current_time.tv_sec*1000000000) - current_fiber->start_time)/1000000;
                     break;
                 }
             }
@@ -433,7 +429,7 @@ void update_timer(struct task_struct *prev, struct task_struct *next){
                     //printk(KERN_INFO "Next pid\n");
                     memset(&current_time, 0, sizeof(struct timespec));
                     getnstimeofday(&current_time);
-                    current_fiber->start_time = current_time.tv_nsec;
+                    current_fiber->start_time = current_time.tv_nsec + current_time.tv_sec*1000000000;
                     break;
                 }
             }
@@ -462,8 +458,10 @@ fiber *get_fiber_by_id(pid_t tgid, int fiber_id){
     hash_for_each_possible_rcu(processes, current_process, table_node, tgid){
         if(current_process->tgid == tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if (current_fiber->fiber_id == fiber_id)
+                if (current_fiber->fiber_id == fiber_id){
+                    printk("%d\n", current_fiber->running_by);
                     return current_fiber;
+                }
             }
         }
     }
