@@ -42,7 +42,6 @@ int convertThreadToFiber(void){
 
             hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
 
-            printk("%d\n", new_fiber->running_by);
             return new_fiber->fiber_id;
         }
     }
@@ -77,7 +76,6 @@ int convertThreadToFiber(void){
     //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
     hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
-    printk("%d\n", new_fiber->running_by);
     //printk(KERN_INFO "[-] First converted thread of tgid %d\n",current->tgid);
     return new_fiber->fiber_id;
 }
@@ -458,10 +456,8 @@ fiber *get_fiber_by_id(pid_t tgid, int fiber_id){
     hash_for_each_possible_rcu(processes, current_process, table_node, tgid){
         if(current_process->tgid == tgid){
             hash_for_each_rcu(current_process->fibers, f_index, current_fiber, table_node){
-                if (current_fiber->fiber_id == fiber_id){
-                    printk("%d\n", current_fiber->running_by);
+                if (current_fiber->fiber_id == fiber_id)
                     return current_fiber;
-                }
             }
         }
     }

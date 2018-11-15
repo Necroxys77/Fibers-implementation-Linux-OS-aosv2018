@@ -135,14 +135,16 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     }
 
     kstrtoul(file->f_path.dentry->d_name.name, 10, &fiber_id);
-    printk("%lu\n", fiber_id);
     if ((fib = get_fiber_by_id(task_pid->tgid, fiber_id)) == NULL)
         return 0;
-    
-    printk("%d\n", fib->running_by);
 
-    snprintf(fiber_stats, STATS_SIZE, "Running: %s\nInitial entry point: 0x%016lx\nParent thread id: %d\nNumber of activations: %d\nNumber of failed activations: %d\nTotal execution time: %lu ms\n", 
-                                        ((fib->running_by == -1) ? "no" : "yes"), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time);
+    snprintf(fiber_stats, STATS_SIZE, "Running: %s\n"
+                                    "Initial entry point: 0x%016lx\n"
+                                    "Parent thread id: %d\n"
+                                    "Number of activations: %d\n"
+                                    "Number of failed activations: %d\n"
+                                    "Total execution time: %lu ms\n", 
+                                    ((fib->running_by == -1) ? "no" : "yes"), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time);
 
     written_bytes = strnlen(fiber_stats, STATS_SIZE);
     if (*ppos >= written_bytes)
