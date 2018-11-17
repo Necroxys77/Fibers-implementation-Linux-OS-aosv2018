@@ -1,3 +1,6 @@
+#ifndef FIBER
+#define FIBER
+
 #include <linux/init.h>           // Macros used to mark up functions e.g. __init __exit
 #include <linux/module.h>         // Core header for loading LKMs into the kernel
 #include <linux/device.h>         // Header to support the kernel Driver Model
@@ -12,7 +15,6 @@
 #include <linux/spinlock.h>
 #include <linux/bitmap.h>
 #include <linux/types.h>
-#include <linux/threads.h>
 #include <linux/timekeeping32.h>
 
 #define MAX_SIZE_FLS 4096
@@ -23,11 +25,10 @@
 typedef void (*entry_point)(void *param);
 
 //check order param?
-typedef struct {
+typedef struct struct_process {
     pid_t tgid; //Key
-    atomic_t total_fibers, nThreads; //increment in convert and decrease in post_doExit - quando arriva a zero, remove process
+    atomic_t total_fibers;
     DECLARE_HASHTABLE(fibers, 10);
-    DECLARE_HASHTABLE(threads, 10);
     struct hlist_node table_node;
 } process;
 
@@ -40,24 +41,20 @@ typedef struct {
     unsigned long exec_time, start_time;
     long long fls[MAX_SIZE_FLS];
     DECLARE_BITMAP(fls_bitmap, MAX_SIZE_FLS);
-    pid_t parent_pid;
-    char running; 
+    pid_t parent_pid, running_by;
     struct hlist_node table_node;
     char fiber_id_string[FIBER_NAME];
     void *initial_entry_point;
 } fiber;
 
 
-typedef struct {
-    pid_t pid;
-    fiber* runningFiber;
-    struct hlist_node table_node;
-} thread;
-
-
 int convertThreadToFiber(void);
 
 int createFiber(unsigned long, entry_point, void *);
+
+fiber *can_switch(void);
+
+fiber *search_target_fiber(int);
 
 int switchToFiber(int);
 
@@ -69,14 +66,14 @@ long flsAlloc(void);
 
 int flsSet(long, long long);
 
-void remove_process(process *);
+fiber *get_running_fiber(int *);
+
+void remove_process(pid_t);
 
 void update_timer(struct task_struct *, struct task_struct *);
 
-inline process *get_process_by_tgid(pid_t);
+process *get_process_by_tgid(pid_t);
 
-inline thread *get_thread_by_pid(process *, pid_t);
-
-inline fiber *get_fiber_by_id(process *, int);
+fiber *get_fiber_by_id(pid_t, int);
 
 #endif

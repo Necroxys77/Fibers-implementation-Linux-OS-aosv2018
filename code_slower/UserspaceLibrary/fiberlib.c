@@ -169,6 +169,9 @@ long long flsGet(long pos){
 bool flsFree(long pos){
     bool success = false;
 
+    if (open_device() != 1)
+        exit(0);
+
     if(pos < 0)
         printf("[!] flsGet: pos is negative\n");
     else {

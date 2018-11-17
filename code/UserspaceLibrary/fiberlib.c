@@ -46,9 +46,13 @@ void *createFiber(size_t stack_size, entry_point function, void *args){
     int new_fiber_id;
     void *sp;
 
-    if(!(stack_size>0))
-        return 0; //error (TO CHECK)
+    if (open_device() != 1)
+        exit(0);
 
+    if(!(stack_size>0)){
+        printf("!stacksize>0, %lu", stack_size);
+        return 0; //error (TO CHECK)
+    }
     //printf("[-] Creating a fiber... \n");
     posix_memalign(&sp, 16, stack_size);
     bzero(sp, stack_size);
@@ -72,6 +76,10 @@ void *createFiber(size_t stack_size, entry_point function, void *args){
 
 void switchToFiber(int fiber_id){
     int success;
+
+    if (open_device() != 1)
+        exit(0);
+
     if(fiber_id>0){
         //printf("[-] Switching to fiber %d...\n", fiber_id);
 
@@ -90,6 +98,9 @@ void switchToFiber(int fiber_id){
 long flsAlloc(){
     long pos;
     
+    if (open_device() != 1)
+        exit(0);
+
     pos = ioctl(fd, FLSALLOC, NULL);
     /*
     if(pos != -1)
@@ -102,6 +113,9 @@ long flsAlloc(){
 
 void flsSet(long pos, long long value){
     int success;
+
+    if (open_device() != 1)
+        exit(0);
 
     if(pos < 0)
         printf("[!] flsSet pos is negative\n");
@@ -122,6 +136,9 @@ void flsSet(long pos, long long value){
 }
 
 long long flsGet(long pos){
+
+    if (open_device() != 1)
+        exit(0);
 
     if(pos < 0)
         printf("[!] flsGet pos is negative\n");
@@ -152,6 +169,9 @@ long long flsGet(long pos){
 
 bool flsFree(long pos){
     bool success = false;
+
+    if (open_device() != 1)
+        exit(0);
 
     if(pos < 0)
         printf("[!] flsGet: pos is negative\n");

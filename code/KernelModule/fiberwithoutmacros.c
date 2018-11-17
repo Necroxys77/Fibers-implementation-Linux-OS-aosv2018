@@ -1,5 +1,4 @@
 #include "fiber.h"
-#include "macro.h"
 
 DEFINE_HASHTABLE(processes, 10);
 
@@ -48,22 +47,51 @@ int convertThreadToFiber(void){
     spin_lock_irqsave(&(process_lock), process_flags);
     current_process = get_process_by_tgid(current->tgid);
     if(current_process == NULL){
+        //first thread within a process calls covert
         //printk(KERN_INFO "Convert: First process: tgid %d, pid %d\n", current->tgid, current->pid);
-        init_process(new_process, processes);
+        //new process
+        new_process = kzalloc(sizeof(process), GFP_KERNEL);
+        new_process->tgid = current->tgid;
+        atomic_set(&(new_process->total_fibers), 0);
+        atomic_set(&(new_process->nThreads), 0);
+        hash_init(new_process->fibers);
+        hash_init(new_process->threads);
+        hash_add_rcu(processes, &(new_process->table_node), new_process->tgid);
         spin_unlock_irqrestore(&(process_lock), process_flags);
 
-        init_thread(new_thread, new_process);
+        //new thread
+        new_thread = kzalloc(sizeof(thread), GFP_KERNEL);
+        new_thread->pid = current->pid;
+        atomic_inc(&(new_process->nThreads));
 
-        init_fiber(new_fiber, new_process);
+        
+        //new fiber
+        new_fiber = kzalloc(sizeof(fiber), GFP_KERNEL);
+        new_fiber->context = kzalloc(sizeof(struct pt_regs), GFP_KERNEL);
+        new_fiber->fpu_regs = kzalloc(sizeof(struct fpu), GFP_KERNEL);
+        bitmap_zero(new_fiber->fls_bitmap, MAX_SIZE_FLS);
+        memset(new_fiber->fls, 0, sizeof(long long)*MAX_SIZE_FLS);
+        spin_lock_init(&(new_fiber->lock));
+        memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+        copy_fxregs_to_kernel(new_fiber->fpu_regs);
+        new_fiber->fiber_id = atomic_inc_return(&(new_process->total_fibers));
+        snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
+        new_fiber->parent_pid = current->pid;
         new_fiber->finalized_activations = 1;
+        new_fiber->failed_activations = 0;
         new_fiber->running = 1;
+        new_fiber->initial_entry_point = (void *) task_pt_regs(current)->ip;
         memset(&current_time, 0, sizeof(struct timespec));
         new_fiber->exec_time = 0;
         getnstimeofday(&current_time);
         new_fiber->start_time = current_time.tv_nsec + current_time.tv_sec*1000000000;
-        
-        new_thread->runningFiber = new_fiber;
         //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
+
+        hash_add_rcu(new_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
+
+        new_thread->runningFiber = new_fiber;
+        hash_add_rcu(new_process->threads, &(new_thread->table_node), new_thread->pid);
+
     } else {
         spin_unlock_irqrestore(&(process_lock), process_flags);
         current_thread = get_thread_by_pid(current_process, current->pid);
@@ -73,18 +101,40 @@ int convertThreadToFiber(void){
            return 0; //error
         }
         //a new thread of a known process issued a convert
-        init_thread(new_thread, current_process);
+        
+        //new thread
+        new_thread = kzalloc(sizeof(thread), GFP_KERNEL);
+        new_thread->pid = current->pid;
+        atomic_inc(&(current_process->nThreads));
 
-        init_fiber(new_fiber, current_process);
+        //new fiber
+        new_fiber = kzalloc(sizeof(fiber), GFP_KERNEL);
+        new_fiber->context = kzalloc(sizeof(struct pt_regs), GFP_KERNEL);
+        new_fiber->fpu_regs = kzalloc(sizeof(struct fpu), GFP_KERNEL);
+        bitmap_zero(new_fiber->fls_bitmap, MAX_SIZE_FLS);
+        memset(new_fiber->fls, 0, sizeof(long long)*MAX_SIZE_FLS);
+        spin_lock_init(&(new_fiber->lock));
+        memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+        copy_fxregs_to_kernel(new_fiber->fpu_regs);
+        new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+        snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
+        new_fiber->parent_pid = current->pid;
         new_fiber->finalized_activations = 1;
+        new_fiber->failed_activations = 0;
         new_fiber->running = 1;
+        new_fiber->initial_entry_point = (void *) task_pt_regs(current)->ip;
         memset(&current_time, 0, sizeof(struct timespec));
         new_fiber->exec_time = 0;
         getnstimeofday(&current_time);
         new_fiber->start_time = current_time.tv_nsec + current_time.tv_sec*1000000000;
+        //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
+        hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
+        
         new_thread->runningFiber = new_fiber;
+        hash_add_rcu(current_process->threads, &(new_thread->table_node), new_thread->pid);
     }
+
     //printk(KERN_INFO "Convert: New fiber %d inserted\n", new_fiber->fiber_id);
     return new_fiber->fiber_id;
 }
@@ -108,15 +158,31 @@ int createFiber(unsigned long sp, entry_point user_function, void *args){
         return 0;
     }
     
-    init_fiber(new_fiber, current_process);
+    new_fiber = kzalloc(sizeof(fiber), GFP_KERNEL);
+    new_fiber->context = kzalloc(sizeof(struct pt_regs), GFP_KERNEL);
+    new_fiber->fpu_regs = kzalloc(sizeof(struct fpu), GFP_KERNEL);
+    bitmap_zero(new_fiber->fls_bitmap, MAX_SIZE_FLS);
+    memset(new_fiber->fls, 0, sizeof(long long)*MAX_SIZE_FLS);
+    spin_lock_init(&(new_fiber->lock));
+    memcpy(new_fiber->context, task_pt_regs(current), sizeof(struct pt_regs));
+    copy_fxregs_to_kernel(new_fiber->fpu_regs);
 
     new_fiber->context->sp = (unsigned long) (sp + STACK_SIZE - 8);
     new_fiber->context->bp = new_fiber->context->sp;
     new_fiber->context->ip = (unsigned long) user_function;
     new_fiber->context->di = (unsigned long) args;
+    new_fiber->fiber_id = atomic_inc_return(&(current_process->total_fibers));
+    snprintf(new_fiber->fiber_id_string, 256, "%d", new_fiber->fiber_id);
+    new_fiber->parent_pid = current->pid;
+    new_fiber->finalized_activations = 0;
+    new_fiber->failed_activations = 0;
+    new_fiber->running = 0;
     new_fiber->initial_entry_point = (void *) user_function;
+    new_fiber->exec_time = 0;
+    new_fiber->start_time = 0;
     //printk(KERN_INFO "New id %d, new_fiber->exec_time = %ld, new_fiber->start_time = %ld", new_fiber->fiber_id, new_fiber->exec_time, new_fiber->start_time);
 
+    hash_add_rcu(current_process->fibers, &(new_fiber->table_node), new_fiber->fiber_id);
     //printk(KERN_INFO "[-] New fiber created [id %d, tgid %d, parent_pid %d]\n", new_fiber->fiber_id, current_process->tgid, new_fiber->parent_pid);
 
     //printk(KERN_INFO "Create: New fiber %d inserted\n", new_fiber->fiber_id);

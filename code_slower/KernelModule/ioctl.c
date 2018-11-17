@@ -196,9 +196,7 @@ static int __init starting(void){
         return PTR_ERR(charDevice);
     }
 
-    
     /*Registering Kprobes*/
-    
     memset(&kp_do_exit, 0, sizeof(kp_do_exit));
     if ((ret_probe = register_kp(&kp_do_exit)) < 0){
         printk(KERN_ALERT "In init, failed to register probe!\n");
@@ -209,7 +207,6 @@ static int __init starting(void){
         printk(KERN_ALERT "In init, failed to register kretprobe!\n");
     }
 
-    
     memset(&kp_proc, 0, sizeof(kp_proc));
     if ((ret_probe = register_kretp_proc_readdir(&kp_proc)) < 0){
         printk(KERN_ALERT "In init, failed to register kretprobe!\n");

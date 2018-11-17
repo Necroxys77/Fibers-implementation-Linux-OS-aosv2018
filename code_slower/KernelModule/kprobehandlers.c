@@ -36,37 +36,26 @@ struct file_operations fiber_ops = {
 /*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
     which was run by the exited thread*/
 void post_do_exit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
-    process *current_process;
     fiber *current_fiber;
-    thread *current_thread;
     struct timespec current_time;
+    int need_clean;
 
-    current_process = get_process_by_tgid(current->tgid);
-    if(current_process == NULL)
-        return;
-    else {
-        //if this is the last thread of that process to exit, then clean all data structures
-        if(!atomic_dec_return(&(current_process->nThreads))){
-            remove_process(current_process);
-            return;
-        }
-        current_thread = get_thread_by_pid(current_process, current->pid);
-        if(current_thread != NULL){
-            current_fiber = current_thread->runningFiber;
-            if(current_fiber != NULL){
-                current_fiber->running = 0;
-                memset(&current_time, 0, sizeof(struct timespec));
-                getnstimeofday(&current_time);
-                //printk(KERN_INFO "Post_do_exit: de-attaching fiber from exiting thread and updating exec time %lu\n", current_fiber->exec_time);
-                current_fiber->exec_time += ((current_time.tv_nsec + current_time.tv_sec*1000000000) - current_fiber->start_time)/1000000;
-                //printk(KERN_INFO "Post_do_exit: updated exec time %lu\n", current_fiber->exec_time);
-            }
-        }
+    current_fiber = get_running_fiber(&need_clean);
+    if(need_clean == 1)
+        remove_process(current->tgid);
+    else if ((current_fiber != NULL)) {
+        //printk(KERN_INFO "Thread %d with tgid %d exited, fiber %d runned by %d\n", current->pid, current->tgid, current_fiber->fiber_id, current_fiber->running_by);
+        current_fiber->running_by = -1;
+        memset(&current_time, 0, sizeof(struct timespec));
+        getnstimeofday(&current_time);
+        current_fiber->exec_time += ((current_time.tv_nsec + current_time.tv_sec*1000000000) - current_fiber->start_time)/1000000;
     }
-   //printk("PostHandler do_exit: eseguito %d\n", current->pid);
+
+    //printk("PostHandler do_exit: eseguito %d\n", current->pid);
 }
 
-
+/*We should not delete anything, just setting to -1 the 'running_by' field of the fiber 
+    which was run by the exited thread*/
 int post_schedule(struct kretprobe_instance *ri, struct pt_regs *regs){
 
     struct task_struct *prev_task = get_cpu_var(prev);
@@ -138,7 +127,6 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     char fiber_stats[STATS_SIZE];
     unsigned long fiber_id;
     fiber *fib;
-    process *my_process;
     size_t written_bytes, offset;
 
     if ((task_pid = get_proc_task(file->f_inode)) == NULL){
@@ -147,14 +135,7 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
     }
 
     kstrtoul(file->f_path.dentry->d_name.name, 10, &fiber_id);
-    
-
-    my_process = get_process_by_tgid(task_pid->tgid);
-    if(my_process == NULL)
-        return 0;
-    
-    fib = get_fiber_by_id(my_process, fiber_id);
-    if (fib == NULL)
+    if ((fib = get_fiber_by_id(task_pid->tgid, fiber_id)) == NULL)
         return 0;
 
     snprintf(fiber_stats, STATS_SIZE, "Running: %s\n"
@@ -163,7 +144,7 @@ ssize_t fiber_read(struct file *file, char __user *buffer, size_t size, loff_t *
                                     "Number of activations: %d\n"
                                     "Number of failed activations: %d\n"
                                     "Total execution time: %lu ms\n", 
-                                    ((fib->running == 0) ? "no" : "yes"), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time);
+                                    ((fib->running_by == -1) ? "no" : "yes"), (unsigned long) fib->initial_entry_point, fib->parent_pid, fib->finalized_activations, fib->failed_activations, fib->exec_time);
 
     written_bytes = strnlen(fiber_stats, STATS_SIZE);
     if (*ppos >= written_bytes)
@@ -191,8 +172,7 @@ struct dentry *fiber_lookup(struct inode *dir, struct dentry *dentry, unsigned i
     if ((task_pid = get_proc_task(dir)) == NULL || dir == NULL || dentry == NULL)
         return ERR_PTR(-ENOENT);
 
-    (current_process = get_process_by_tgid(task_pid->tgid));
-    if (current_process == NULL){
+    if ((current_process = get_process_by_tgid(task_pid->tgid)) == NULL){
         //printk("fiber_lookup no\n");
         return 0;//real_lookup(dir, dentry, NULL, 0);
     }

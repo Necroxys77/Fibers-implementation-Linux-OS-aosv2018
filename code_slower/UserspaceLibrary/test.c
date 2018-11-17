@@ -18,20 +18,17 @@ int matteo(void **ciao){
     printf("%f\n",mark);
 
     pos = flsAlloc();
+    //pos2 = flsAlloc();
     val = (long long) 77;
     flsSet(pos,val);
-    
-    //should fail
-    //flsSet(3,(long long) 34);
-    //should fail
-    //val2 = flsGet(3);
-    
-    val2 = flsGet(pos);
+    flsSet(3,(long long) 34);
+    //flsSet(999,val); //CASE TO HANDLE! See flsSet description into fiber.c
+    val2 = flsGet(3);
+    //flsGet(21);
     flsFree(pos);
-    
-    //should fail
-    //flsFree(3);
+    flsFree(3);
 
+    
     printf("Matteo\n");
     struct stru *prova;
     printf("Mariani\n");
