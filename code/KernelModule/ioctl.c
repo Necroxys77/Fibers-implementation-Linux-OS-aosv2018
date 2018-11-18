@@ -1,19 +1,16 @@
 #include "ioctl.h"
 
-//static DEFINE_HASHTABLE(processes, 10); //QUI?
 static int majorNumber;
-static struct class* charClass  = NULL; // The device-driver class struct pointer
-static struct device* charDevice = NULL; // The device-driver device struct pointer
+static struct class* charClass  = NULL;
+static struct device* charDevice = NULL;
 struct kprobe kp_do_exit;
-struct kretprobe kp_schedule, kp_proc, kp_proc_lookup;
+struct kretprobe kretp_finish_task_switch, kretp_proc_readdir, kretp_proc_lookup;
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
-static struct file_operations fops =
-{
+static struct file_operations fops = {
     .owner = THIS_MODULE,
     .unlocked_ioctl= my_ioctl
-    //.release = my_release
 };
 
 
@@ -26,40 +23,30 @@ static char *unlock_sudo(struct device *dev, umode_t *mode){
 
 
 static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
-    int fiber_id, success;
+    int fiber_id, ret;
     long pos;
     long long value;
     struct ioctl_params *params;
 
     switch(cmd){
         case CONVERT:
-            //printk(KERN_INFO "[-] Converting thread into a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
             fiber_id = convertThreadToFiber();
-            printk("%d\n", current->pid);
-            /*
-            if(fiber_id)
-                printk(KERN_INFO "[+] convertThreadToFiber: succeded!\n");
-            else
-                printk(KERN_ALERT "[!] Thread has already issued convertThreadToFiber! [tgid %d, pid %d]\n", current->tgid, current->pid);
-            */
+            printk("[-] Convert: tgid %d, pid %d\n", current->tgid, current->pid);
+            if(!fiber_id)
+                printk(KERN_ALERT "[!] Convert: thread has already issued convertThreadToFiber! [tgid %d, pid %d]\n", current->tgid, current->pid);
+            
             return fiber_id;
-        
+
         case CREATE:
             params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
             if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-
-            //printk(KERN_INFO "[-] Creating a fiber... [tgid %d, pid %d]\n", current->tgid, current->pid);
             fiber_id = createFiber(params->sp, params->user_func, params->args);
-
-            /*
-            if(fiber_id)
-                printk(KERN_INFO "[+] createFiber: succeded!\n");
-            else
-                printk(KERN_ALERT "[!] Thread not authorized to create fibers! convertThreadToFiber not issued yet!\n");
-            */
+            if(!fiber_id)
+                printk(KERN_ALERT "[!] Create: thread not authorized to create fibers! convertThreadToFiber not issued yet!\n");
+            
             kfree(params);
             return fiber_id;
 
@@ -67,100 +54,64 @@ static long my_ioctl(struct file *file, unsigned int cmd, unsigned long arg){
             params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
             if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-
-            //printk(KERN_INFO "[-] Switching to Fiber %d ...\n", params->fiber_id);
-            success = switchToFiber(params->fiber_id);
+            ret = switchToFiber(params->fiber_id);
             /*
-            if(success)
-                printk(KERN_INFO "[+] switchToFiber: succeded!\n");
-            else
+            if(!ret)
                 printk(KERN_ALERT "[!] Impossible to switch to fiber %d!\n", params->fiber_id);
             */
             kfree(params);
-            return success;
+            return ret;
 
         case FLSALLOC:
             pos = flsAlloc();
-            /*
-            if(pos!=-1)
-                printk(KERN_INFO "[+] flsAlloc: succeded! pos %ld\n",pos);
-            else
-                printk(KERN_ALERT "[!] No more space in fiber fls...\n");
-            */
+
             return pos;
 
         case FLSSET:
             params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
             if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-
-            success = flsSet(params->pos, params->value);
-            /*
-            if(success)
-                printk(KERN_INFO "[+] flsSet: succeded! value %lld to pos %ld\n", params->value, params->pos);
-            else
-                printk(KERN_INFO "[!] flsSet: failed! value %lld to pos %ld\n", params->value, params->pos);
-            */
+            ret = flsSet(params->pos, params->value);
+            
             kfree(params);
-            return success;
+            return ret;
 
         case FLSGET:
             params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
             if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-            
             value = flsGet(params->pos);
-            /*if(value!=0){
-                printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
-                params->value = (long long) value; success = 1;
-            } else{
-                printk(KERN_INFO "[!] flsGet: failed! pos %ld\n",params->pos);
-                success = 0;
-            }*/
-
-            //printk(KERN_INFO "[+] flsGet: succeded! value %lld from pos %ld\n", (long long) value, params->pos);
             params->value = value; 
-
             if (copy_to_user((void *) arg, params, sizeof(struct ioctl_params)) != 0){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-            success = 1;
             
             kfree(params);
-            return success;
+            return 1;
 
         case FLSFREE:
-
             params = kzalloc(sizeof(struct ioctl_params), GFP_KERNEL);
             if(copy_from_user(params, (void *) arg, sizeof(struct ioctl_params))){
                 kfree(params);
-                return 0; //error copy failed
+                return 0;
             }
-
-            success = flsFree(params->pos);
-            /*
-            if(success)
-                 printk(KERN_INFO "[+] flsFree: succeded! pos %ld\n", params->pos);
-            else
-                printk(KERN_INFO "[!] flsFree: failed! pos %ld\n", params->pos);
-            */
+            ret = flsFree(params->pos);
+            
             kfree(params);
-            return success;
+            return ret;
     }
-
     return -1;
 }
 
 
 static int __init starting(void){
-
     int ret_probe;
 
     printk(KERN_INFO "We are in _init!\n");
@@ -197,30 +148,30 @@ static int __init starting(void){
     }
 
     
-    /*Registering Kprobes*/
+    /*Registering Kprobes and Kretprobes*/
     
     memset(&kp_do_exit, 0, sizeof(kp_do_exit));
-    if ((ret_probe = register_kp(&kp_do_exit)) < 0){
-        printk(KERN_ALERT "In init, failed to register probe!\n");
+    if ((ret_probe = register_kp_doExit(&kp_do_exit)) < 0){
+        printk(KERN_ALERT "In init, failed to register kprobe for do exit!\n");
     }
 
-    memset(&kp_schedule, 0, sizeof(kp_schedule));
-    if ((ret_probe = register_kretp(&kp_schedule)) < 0){
-        printk(KERN_ALERT "In init, failed to register kretprobe!\n");
+    memset(&kretp_finish_task_switch, 0, sizeof(kretp_finish_task_switch));
+    if ((ret_probe = register_kretp_finishTaskSwitch(&kretp_finish_task_switch)) < 0){
+        printk(KERN_ALERT "In init, failed to register kretprobe for finish_task_switch!\n");
     }
 
     
-    memset(&kp_proc, 0, sizeof(kp_proc));
-    if ((ret_probe = register_kretp_proc_readdir(&kp_proc)) < 0){
-        printk(KERN_ALERT "In init, failed to register kretprobe!\n");
+    memset(&kretp_proc_readdir, 0, sizeof(kretp_proc_readdir));
+    if ((ret_probe = register_kretp_procReaddir(&kretp_proc_readdir)) < 0){
+        printk(KERN_ALERT "In init, failed to register kretprobe for proc_readdir!\n");
     }
 
-    memset(&kp_proc_lookup, 0, sizeof(kp_proc_lookup));
-    if ((ret_probe = register_kretp_proc_lookup(&kp_proc_lookup)) < 0){
-        printk(KERN_ALERT "In init, failed to register kretprobe!\n");
+    memset(&kretp_proc_lookup, 0, sizeof(kretp_proc_lookup));
+    if ((ret_probe = register_kretp_procLookup(&kretp_proc_lookup)) < 0){
+        printk(KERN_ALERT "In init, failed to register kretprobe for proc_lookup!\n");
     }
 
-    printk(KERN_INFO "Device class created correctly, __init finished!\n"); // Made it! device was initialized
+    printk(KERN_INFO "Device class created correctly, __init finished!\n");
     return 0;
 }
 
@@ -231,15 +182,15 @@ static void __exit exiting(void){
     class_unregister(charClass);                          // unregister the device class
     class_destroy(charClass);                             // remove the device class
     unregister_chrdev(majorNumber, "DeviceName");             // unregister the major number
-    unregister_kp(&kp_do_exit);
-    unregister_kretp(&kp_schedule);
-    unregister_kretp(&kp_proc);
-    unregister_kretp(&kp_proc_lookup);
+    unregister_kp_doExit(&kp_do_exit);
+    unregister_kretp(&kretp_finish_task_switch);
+    unregister_kretp(&kretp_proc_readdir);
+    unregister_kretp(&kretp_proc_lookup);
     printk(KERN_INFO "Goodbye from the LKM!\n");
 }
 
 MODULE_LICENSE("Dual BSD/GPL");
-MODULE_AUTHOR("ricmat");
+MODULE_AUTHOR("Matteo Mariani (1815188), Riccardo Chiaretti (1661390)");
 MODULE_DESCRIPTION("fiber module");
 
 module_init(starting);

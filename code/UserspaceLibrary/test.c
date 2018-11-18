@@ -5,8 +5,6 @@ struct stru {
     char *name;
 };
 
-//file descriptor
-
 /* TEST FUNCTIONS */
 int matteo(void **ciao){
     float mark;
@@ -22,15 +20,15 @@ int matteo(void **ciao){
     flsSet(pos,val);
     
     //should fail
-    //flsSet(3,(long long) 34);
+    flsSet(3,(long long) 34);
     //should fail
-    //val2 = flsGet(3);
+    val2 = flsGet(3);
     
     val2 = flsGet(pos);
     flsFree(pos);
     
     //should fail
-    //flsFree(3);
+    flsFree(3);
 
     printf("Matteo\n");
     struct stru *prova;
@@ -92,22 +90,22 @@ int main(int argc, char const *argv[]){
     unsigned long a, b, c, d, e;
 
     //should fail
-    //d =  (unsigned long) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
+    d =  (unsigned long) createFiber(STACK_SIZE, (entry_point_t) matteo, (void *) &str);
 
     //should fail
-    //switchToFiber(5);
+    switchToFiber(5);
 
     a = (unsigned long) convertThreadToFiber();
 
     //should fail
-    //e = (unsigned long) convertThreadToFiber();
+    e = (unsigned long) convertThreadToFiber();
 
-    b = (unsigned long) createFiber(STACK_SIZE, (entry_point) matteo, (void *) &str);
+    b = (unsigned long) createFiber(STACK_SIZE, (entry_point_t) matteo, (void *) &str);
 
-    c = (unsigned long) createFiber(STACK_SIZE, (entry_point) riccardo, (void *) &str);
+    c = (unsigned long) createFiber(STACK_SIZE, (entry_point_t) riccardo, (void *) &str);
 
     //should fail
-    //switchToFiber(99);
+    switchToFiber(99);
 
     //let's dance...
     switchToFiber(2);

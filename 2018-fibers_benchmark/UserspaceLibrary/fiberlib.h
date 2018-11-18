@@ -18,7 +18,7 @@
 #define FLSFREE _IO(MAGIC, 6)
 #define STACK_SIZE (4096*2)
 
-typedef void (*entry_point)(void *param);
+typedef void (*entry_point_t)(void *param);
 
 struct ioctl_params {
     long pos;
@@ -26,13 +26,13 @@ struct ioctl_params {
     void *args;
     unsigned long sp;
     unsigned long bp;
-    entry_point user_func;
+    entry_point_t user_func;
     int fiber_id;
 };
 
 extern void *convertThreadToFiber(void);
 
-extern void *createFiber(size_t stack_size, entry_point function, void *args);
+extern void *createFiber(size_t stack_size, entry_point_t function, void *args);
 
 extern void switchToFiber(int fiber_id);
 

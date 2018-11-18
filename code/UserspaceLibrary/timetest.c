@@ -55,7 +55,7 @@ int main(){
 
     printf("Starting test...\n");
     a = (unsigned long) convertThreadToFiber();
-    b = (unsigned long) createFiber(STACK_SIZE, (entry_point) function, (void *) &c);
+    b = (unsigned long) createFiber(STACK_SIZE, (entry_point_t) function, (void *) &c);
 
     long counter = 0;
     while(1){

@@ -1,8 +1,10 @@
-#ifndef ioctlm
-#define ioctlm
-
-#include "fiber.h"
-#include "kprobehandlers.h"
+#include <linux/slab.h>
+#include <linux/module.h>
+#include <linux/device.h>
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+#include <linux/sched/task_stack.h>
+#include "kprobe.h"
 
 #define MAGIC '7'
 #define CONVERT _IO(MAGIC, 0)
@@ -19,7 +21,7 @@ struct ioctl_params {
     void *args;
     unsigned long sp;
     unsigned long bp;
-    entry_point user_func;
+    entry_point_t user_func;
     int fiber_id;
 };
 
@@ -30,5 +32,3 @@ static char *unlock_sudo(struct device *, umode_t *);
 static int __init starting(void);
 
 static void __exit exiting(void);
-
-#endif
