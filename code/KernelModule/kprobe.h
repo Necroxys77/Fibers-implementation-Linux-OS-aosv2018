@@ -2,7 +2,7 @@
 #include <linux/proc_fs.h>
 #include "fiber.h"
 
-#define STATS_SIZE 1024
+#define STATS_SIZE 512
 
 union proc_op {
 	int (*proc_get_link)(struct dentry *, struct path *);
