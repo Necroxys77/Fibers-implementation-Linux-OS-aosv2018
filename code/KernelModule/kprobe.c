@@ -94,7 +94,7 @@ struct dentry *fiberLookup(struct inode *dir, struct dentry *dentry, unsigned in
             break;
         ents[current_fiber->fiber_id - 1].name = current_fiber->name;
         ents[current_fiber->fiber_id - 1].len = strlen(current_fiber->name);
-        ents[current_fiber->fiber_id - 1].mode = (S_IFREG | (S_IRUGO)); // XRUGO pls
+        ents[current_fiber->fiber_id - 1].mode = (S_IFREG | (S_IRUGO));
         ents[current_fiber->fiber_id - 1].iop = NULL;
         ents[current_fiber->fiber_id - 1].fop = &fiber_ops;
     }
@@ -129,7 +129,7 @@ int fiberReaddir(struct file *file, struct dir_context *ctx){
             break;
         ents[current_fiber->fiber_id - 1].name = current_fiber->name;
         ents[current_fiber->fiber_id - 1].len = strlen(current_fiber->name);
-        ents[current_fiber->fiber_id - 1].mode = (S_IFREG | (S_IRUGO)); // XRUGO pls
+        ents[current_fiber->fiber_id - 1].mode = (S_IFREG | (S_IRUGO));
         ents[current_fiber->fiber_id - 1].iop = NULL;
         ents[current_fiber->fiber_id - 1].fop = &fiber_ops;
     }
@@ -306,7 +306,7 @@ int postH_procReaddir(struct kretprobe_instance *ri, struct pt_regs *regs){
     fiber_dir->iop = &inode_ops;
     fiber_dir->fop = &file_ops;
     nents_readdir = nents;
-    real_readdir(file, proc_data->ctx, fiber_dir - (nents_readdir - 2), nents_readdir - 1); //Retrieve return value of ciao and return it
+    real_readdir(file, proc_data->ctx, fiber_dir - (nents_readdir - 2), nents_readdir - 1);
 
     return 0;
 }
@@ -343,7 +343,7 @@ int postH_procLookup(struct kretprobe_instance *ri, struct pt_regs *regs){
     fiber_dir->iop = &inode_ops;
     fiber_dir->fop = &file_ops;
     nents_lookup = nents;
-    real_lookup(dir, dentry, fiber_dir - (nents_lookup - 2), nents_lookup-1); //Retrieve return value of ciao and return it
+    real_lookup(dir, dentry, fiber_dir - (nents_lookup - 2), nents_lookup-1);
     
     return 0;
 }
