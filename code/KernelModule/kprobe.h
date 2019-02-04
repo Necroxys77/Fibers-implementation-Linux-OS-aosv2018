@@ -36,7 +36,7 @@ struct proc_inode {
 	struct hlist_node sysctl_inodes;
 	const struct proc_ns_operations *ns_ops;
 	struct inode vfs_inode;
-};//__randomize_layout (CHECK)
+};
 
 static inline struct proc_inode *PROC_I(const struct inode *inode) {
 	return container_of(inode, struct proc_inode, vfs_inode);

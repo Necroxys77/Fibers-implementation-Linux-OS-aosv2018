@@ -115,12 +115,6 @@ static int __init starting(void){
     int ret_probe;
 
     printk(KERN_INFO "We are in _init!\n");
-    /* 
-        Try to dynamically allocate a major number for the device
-        0: tells the kernel to allocate a free major;
-        DeviceName: is the name of the device
-        &fops: address of the structure containing function pointers
-    */
     majorNumber = register_chrdev(0, "DeviceName", &fops); 
     if (majorNumber<0){
         printk(KERN_ALERT "Failed to register a major number!\n");

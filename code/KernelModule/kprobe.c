@@ -170,7 +170,7 @@ void postH_doExit(struct kprobe *p, struct pt_regs *regs, unsigned long flags){
         current_thread = getThreadByPid(current_process, current->pid);
         if(current_thread != NULL){
             current_fiber = current_thread->running_fiber;
-            if(current_fiber != NULL){
+            if(current_fiber != NULL){//context?
                 current_fiber->running = 0;
                 memset(&current_time, 0, sizeof(struct timespec));
                 getnstimeofday(&current_time);

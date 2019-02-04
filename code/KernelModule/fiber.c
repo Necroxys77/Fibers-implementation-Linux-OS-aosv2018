@@ -160,7 +160,7 @@ int switchToFiber(int target_fiber_id){
         //For statistics
         target_fiber->activations += 1;
 
-        //realising calling fiber
+        //releasing calling fiber
         calling_fiber->running = 0;
 
         current_thread->running_fiber = target_fiber;
@@ -194,7 +194,7 @@ long flsAlloc(void){
         return -1;
 
     change_bit(pos, current_fiber->fls_bitmap);
-    current_fiber->fls[pos] = 0; // to clean
+    current_fiber->fls[pos] = 0;
 
     return pos;
 }
