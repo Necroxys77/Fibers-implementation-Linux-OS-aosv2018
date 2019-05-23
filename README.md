@@ -1,5 +1,5 @@
-# aosv_project_2018
-Linux Fibers. Authors: Matteo Mariani (1815188) &amp; Riccardo Chiaretti (16611390).
+# Fibers Iimplementation in Linux operating system [aosv_project_2018]
+Authors: Matteo Mariani (1815188) &amp; Riccardo Chiaretti (16611390).
 
 (update 18/11/2018)
 There are two version of the code:
