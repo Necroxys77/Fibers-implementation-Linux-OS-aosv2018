@@ -1,4 +1,4 @@
-# Fibers Iimplementation in Linux operating system [aosv_project_2018]
+# Fibers Iimplementation in Linux operating system [Advanced Operating Systems and Virtualization - 2018]
 Authors: Matteo Mariani (1815188) &amp; Riccardo Chiaretti (16611390).
 
 (update 18/11/2018)
